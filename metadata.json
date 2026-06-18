@@ -1,0 +1,6 @@
+{
+  "name": "Selvalakshmi Institute of Health Education Portal",
+  "description": "Naturopathy course management, student registration, video library, and certification.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

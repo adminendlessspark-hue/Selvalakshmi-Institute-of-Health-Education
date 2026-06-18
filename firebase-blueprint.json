@@ -1,0 +1,100 @@
+{
+  "entities": {
+    "Course": {
+      "title": "Course",
+      "description": "A course definition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "duration": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "fee": { "type": "string" }
+      },
+      "required": ["title", "duration", "description"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "A student registration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "courseId": { "type": "string" },
+        "address": { "type": "string" },
+        "place": { "type": "string" },
+        "country": { "type": "string" },
+        "registrationDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      },
+      "required": ["firstName", "lastName", "email", "phone", "courseId", "address", "registrationDate", "status"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "Video of a course",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "duration": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "required": ["courseId", "title", "duration", "thumbnail"]
+    },
+    "TestimonialVideo": {
+      "title": "Testimonial Video",
+      "description": "A testimonial video",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "required": ["title", "url"]
+    },
+    "GlobalSettings": {
+      "title": "Global Settings",
+      "description": "Global settings for the application",
+      "type": "object",
+      "properties": {
+        "logoUrl": { "type": "string" },
+        "gpayQrUrl": { "type": "string" },
+        "founderVideoUrl": { "type": "string" },
+        "aboutVideoUrl": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "youtubeUrl": { "type": "string" },
+        "instagramUrl": { "type": "string" },
+        "heroImages": { "type": "array", "items": { "type": "string"} }
+      }
+    }
+  },
+  "firestore": {
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Collection of courses"
+    },
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Collection of registered students"
+    },
+    "/videos/{videoId}": {
+      "schema": "Video",
+      "description": "Collection of videos"
+    },
+    "/testimonialVideos/{videoId}": {
+      "schema": "TestimonialVideo",
+      "description": "Collection of testimonial videos"
+    },
+    "/settings/{settingId}": {
+      "schema": "GlobalSettings",
+      "description": "Global settings singleton"
+    }
+  }
+}
