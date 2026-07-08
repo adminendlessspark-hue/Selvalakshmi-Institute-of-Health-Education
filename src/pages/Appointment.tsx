@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useStore } from "../context/StoreContext";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle, Loader2, MessageCircle, Mail } from "lucide-react";
 import { cn } from "../lib/utils";
 import { getOAuthToken } from "../lib/oauth";
 
@@ -66,12 +66,22 @@ export function Appointment() {
         body: JSON.stringify({ amount: fee, title: "Consultation Fee" }),
       });
 
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Payment gateway returned an invalid response. If you are in the preview environment, please open this application in a new tab to complete authorization.");
+      }
+
       const orderData = await response.json();
       if (!response.ok) {
         throw new Error(orderData.error || "Failed to create Razorpay order");
       }
 
       const keyResponse = await fetch("/api/razorpay-key");
+      const keyContentType = keyResponse.headers.get("content-type");
+      if (!keyContentType || !keyContentType.includes("application/json")) {
+        throw new Error("Failed to load payment configuration. If you are in the preview environment, please open this application in a new tab to complete authorization.");
+      }
+
       const keyData = await keyResponse.json();
       if (!keyData.key) {
         throw new Error("Razorpay Key ID not configured on server.");
@@ -159,8 +169,8 @@ export function Appointment() {
             Your appointment has been successfully scheduled and confirmed for {formData.date} at {formData.time}.
           </p>
 
-          <div className="bg-white border-2 border-sage-100 p-8 rounded-2xl text-left mb-8 shadow-sm">
-            <h3 className="font-bold text-slate-900 mb-4 text-lg">Appointment Details</h3>
+          <div className="bg-white border border-sage-100 p-8 rounded-2xl text-left mb-6 shadow-sm">
+            <h3 className="font-bold text-slate-900 mb-4 text-lg border-b pb-2">Appointment Details</h3>
             <div className="space-y-3 text-slate-700">
               <p><strong>Name:</strong> {formData.name}</p>
               <p><strong>Date & Time:</strong> {formData.date} at {formData.time}</p>
@@ -171,15 +181,62 @@ export function Appointment() {
                   <a href={generatedMeetLink} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:text-purple-800 break-all font-medium underline">
                     {generatedMeetLink}
                   </a>
-                  <p className="text-sm text-purple-700 mt-2">
-                    We've opened WhatsApp / your Email client to send you this link automatically.
-                  </p>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="border-t border-sage-100 pt-6">
+          <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl mb-8 text-left">
+            <h3 className="font-bold text-slate-900 mb-3 text-base flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-emerald-600" /> Send Booking Notifications
+            </h3>
+            <p className="text-sm text-slate-600 mb-4">
+              If the automatic notification did not open, you can send or receive the confirmation on WhatsApp/Email using the buttons below.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => {
+                  const customerPhone = formData.phone.replace(/[^0-9]/g, '');
+                  const finalMeetLink = generatedMeetLink || appointmentSettings?.defaultMeetLink || "Link will be shared by Admin";
+                  const message = `Hello ${formData.name},\n\nYour consultation appointment is confirmed for ${formData.date} at ${formData.time}.\n\nPlease join using this Google Meet link: ${finalMeetLink}\n\nFrom: jcmpselvalakshmifoundation@gmail.com`;
+                  window.open(`https://wa.me/91${customerPhone}?text=${encodeURIComponent(message)}`, '_blank');
+                }}
+                className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition shadow-sm text-sm"
+              >
+                <MessageCircle className="w-4 h-4" /> Send to My WhatsApp
+              </button>
+
+              {whatsappNumber && (
+                <button
+                  onClick={() => {
+                    const cleanAdminPhone = whatsappNumber.replace(/[^0-9]/g, '');
+                    const finalMeetLink = generatedMeetLink || appointmentSettings?.defaultMeetLink || "Link will be shared by Admin";
+                    const adminMessage = `New Consultation Appointment Booked!\n\nName: ${formData.name}\nPhone: +91 ${formData.phone}\nEmail: ${formData.email || 'N/A'}\nDate: ${formData.date}\nTime: ${formData.time}\nMeet Link: ${finalMeetLink}`;
+                    window.open(`https://wa.me/${cleanAdminPhone}?text=${encodeURIComponent(adminMessage)}`, '_blank');
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-sm text-sm"
+                >
+                  <MessageCircle className="w-4 h-4" /> Notify Admin on WhatsApp
+                </button>
+              )}
+
+              {formData.email && (
+                <button
+                  onClick={() => {
+                    const finalMeetLink = generatedMeetLink || appointmentSettings?.defaultMeetLink || "Link will be shared by Admin";
+                    const message = `Hello ${formData.name},\n\nYour consultation appointment is confirmed for ${formData.date} at ${formData.time}.\n\nPlease join using this Google Meet link: ${finalMeetLink}\n\nFrom: jcmpselvalakshmifoundation@gmail.com`;
+                    const subject = `Consultation Appointment Confirmation - ${formData.date} ${formData.time}`;
+                    window.open(`mailto:${formData.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`, '_blank');
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 bg-slate-700 text-white px-4 py-3 rounded-xl font-semibold hover:bg-slate-800 transition shadow-sm text-sm"
+                >
+                  <Mail className="w-4 h-4" /> Send Email
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100 pt-6">
             <Link to="/" className="text-slate-500 hover:text-slate-700 font-medium">
               ← Return to Home
             </Link>

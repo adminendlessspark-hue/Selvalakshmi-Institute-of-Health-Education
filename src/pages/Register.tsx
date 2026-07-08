@@ -126,10 +126,20 @@ export function Register() {
             }),
           });
           
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            throw new Error("Payment gateway returned an invalid response. If you are in the preview environment, please open this application in a new tab to complete authorization.");
+          }
+
           const orderData = await response.json();
           if (!response.ok) throw new Error(orderData.error || "Failed to create session");
           
           const keyResponse = await fetch("/api/razorpay-key");
+          const keyContentType = keyResponse.headers.get("content-type");
+          if (!keyContentType || !keyContentType.includes("application/json")) {
+            throw new Error("Failed to load payment configuration. If you are in the preview environment, please open this application in a new tab to complete authorization.");
+          }
+
           const keyData = await keyResponse.json();
           if (!keyData.key) throw new Error("Razorpay Key ID not configured");
           
