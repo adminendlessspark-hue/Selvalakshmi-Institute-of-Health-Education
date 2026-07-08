@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { CreditCard, Loader2 } from "lucide-react";
+import { API_BASE } from "../config";
 
 const loadRazorpay = () => {
   return new Promise((resolve) => {
@@ -33,7 +34,7 @@ export function PaymentButton({ amount, title, className = "", label = "Pay Now"
       }
 
       // Call our backend API to create an order
-      const response = await fetch("/api/create-razorpay-order", {
+      const response = await fetch(`${API_BASE}/api/create-razorpay-order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -48,7 +49,7 @@ export function PaymentButton({ amount, title, className = "", label = "Pay Now"
       }
 
       // Get Razorpay Key ID from server
-      const keyResponse = await fetch("/api/razorpay-key");
+      const keyResponse = await fetch(`${API_BASE}/api/razorpay-key`);
       const keyData = await keyResponse.json();
       
       if (!keyData.key) {

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, CheckCircle, Loader2, MessageCircle, Mail } from "lucide-react";
 import { cn } from "../lib/utils";
 import { getOAuthToken } from "../lib/oauth";
+import { API_BASE } from "../config";
 
 const loadRazorpay = () => {
   return new Promise((resolve) => {
@@ -60,7 +61,7 @@ export function Appointment() {
         throw new Error("Razorpay SDK failed to load. Are you online?");
       }
 
-      const response = await fetch("/api/create-razorpay-order", {
+      const response = await fetch(`${API_BASE}/api/create-razorpay-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: fee, title: "Consultation Fee" }),
@@ -76,7 +77,7 @@ export function Appointment() {
         throw new Error(orderData.error || "Failed to create Razorpay order");
       }
 
-      const keyResponse = await fetch("/api/razorpay-key");
+      const keyResponse = await fetch(`${API_BASE}/api/razorpay-key`);
       const keyContentType = keyResponse.headers.get("content-type");
       if (!keyContentType || !keyContentType.includes("application/json")) {
         throw new Error("Failed to load payment configuration. If you are in the preview environment, please open this application in a new tab to complete authorization.");

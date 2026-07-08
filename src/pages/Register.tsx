@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { QRCodeSVG } from "qrcode.react";
+import { API_BASE } from "../config";
 
 const loadRazorpay = () => {
   return new Promise((resolve) => {
@@ -117,7 +118,7 @@ export function Register() {
           const isLoaded = await loadRazorpay();
           if (!isLoaded) throw new Error("Razorpay SDK not loaded");
 
-          const response = await fetch("/api/create-razorpay-order", {
+          const response = await fetch(`${API_BASE}/api/create-razorpay-order`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
@@ -134,7 +135,7 @@ export function Register() {
           const orderData = await response.json();
           if (!response.ok) throw new Error(orderData.error || "Failed to create session");
           
-          const keyResponse = await fetch("/api/razorpay-key");
+          const keyResponse = await fetch(`${API_BASE}/api/razorpay-key`);
           const keyContentType = keyResponse.headers.get("content-type");
           if (!keyContentType || !keyContentType.includes("application/json")) {
             throw new Error("Failed to load payment configuration. If you are in the preview environment, please open this application in a new tab to complete authorization.");
