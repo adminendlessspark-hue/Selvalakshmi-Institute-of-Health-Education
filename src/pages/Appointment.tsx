@@ -55,33 +55,7 @@ export function Appointment() {
   };
 
   const submitAppointment = async (statusToSet: "pending" | "confirmed", paymentReference: string) => {
-    let meetLink = appointmentSettings?.defaultMeetLink || "";
-    try {
-      const token = await getOAuthToken(['https://www.googleapis.com/auth/meetings.space.created']);
-      const response = await fetch("https://meet.googleapis.com/v2/spaces", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({})
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.meetingUri) {
-          meetLink = data.meetingUri;
-          console.log("Autopilot: Successfully generated dynamic Google Meet link:", meetLink);
-        } else {
-          console.warn("Autopilot: No meetingUri in response, falling back to default Meet link");
-        }
-      } else {
-        const errorText = await response.text();
-        console.warn("Autopilot: Meet API failed, falling back. Status:", response.status, errorText);
-      }
-    } catch (err) {
-      console.warn("Autopilot: Google Meet link generation error, falling back to default Meet link:", err);
-    }
-
+    const meetLink = appointmentSettings?.defaultMeetLink || "";
     try {
       const result = await addAppointment({
         ...formData,
