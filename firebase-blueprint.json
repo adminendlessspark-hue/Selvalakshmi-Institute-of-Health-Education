@@ -59,6 +59,24 @@
       },
       "required": ["title", "url"]
     },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "A physical or virtual consultation appointment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "problem": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed"] },
+        "meetLink": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "phone", "date", "time", "status", "createdAt"]
+    },
     "GlobalSettings": {
       "title": "Global Settings",
       "description": "Global settings for the application",
@@ -91,6 +109,10 @@
     "/testimonialVideos/{videoId}": {
       "schema": "TestimonialVideo",
       "description": "Collection of testimonial videos"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Collection of booked consultation appointments"
     },
     "/settings/{settingId}": {
       "schema": "GlobalSettings",

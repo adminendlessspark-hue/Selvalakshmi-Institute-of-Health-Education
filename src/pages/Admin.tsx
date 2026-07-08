@@ -18,6 +18,46 @@ const formatDateString = (dateStr: string) => {
   }
 };
 
+const convertToEmbedUrl = (input: string | null | undefined): string => {
+  if (!input) return "";
+  const trimmed = input.trim();
+  
+  // 1. Try to extract from iframe src attribute if user pasted an iframe
+  const srcMatch = trimmed.match(/src=["']([^"']+)["']/i);
+  let url = srcMatch && srcMatch[1] ? srcMatch[1] : trimmed;
+
+  // Ensure it has a protocol
+  if (url.startsWith('//')) {
+    url = 'https:' + url;
+  }
+
+  // 2. Check for YouTube embed URL directly
+  const embedMatch = url.match(/(?:youtube\.com|youtube-nocookie\.com)\/embed\/([^?&#\s]+)/i);
+  if (embedMatch && embedMatch[1]) {
+    return `https://www.youtube.com/embed/${embedMatch[1]}`;
+  }
+
+  // 3. Check for standard watch link (m.youtube.com or youtube.com)
+  const watchMatch = url.match(/(?:youtube\.com\/watch\?v=|youtube\.com\/watch\?.+&v=)([^?&#\s]+)/i);
+  if (watchMatch && watchMatch[1]) {
+    return `https://www.youtube.com/embed/${watchMatch[1]}`;
+  }
+
+  // 4. Check for shortened link (youtu.be)
+  const shortMatch = url.match(/youtu\.be\/([^?&#\s]+)/i);
+  if (shortMatch && shortMatch[1]) {
+    return `https://www.youtube.com/embed/${shortMatch[1]}`;
+  }
+
+  // 5. Check for YouTube shorts link
+  const shortsMatch = url.match(/youtube\.com\/shorts\/([^?&#\s]+)/i);
+  if (shortsMatch && shortsMatch[1]) {
+    return `https://www.youtube.com/embed/${shortsMatch[1]}`;
+  }
+
+  return url;
+};
+
 export function Admin() {
   const { 
     courses, students, appointments, videos, logoUrl, heroImages, heroOverlayColor, heroOverlayOpacity, gpayQrUrl, testimonialVideos,
@@ -115,23 +155,7 @@ export function Admin() {
     e.preventDefault();
     if (!newCourse.id) newCourse.id = newCourse.title.toLowerCase().replace(/\s+/g, '-');
     
-    let finalUrl = newCourse.videoUrl || '';
-    if (finalUrl) {
-      const srcMatch = finalUrl.match(/src=["']([^"']+)["']/);
-      const watchMatch = finalUrl.match(/youtube\.com\/watch\?v=([^&]+)/);
-      const shortMatch = finalUrl.match(/youtu\.be\/([^?]+)/);
-      const shortsMatch = finalUrl.match(/youtube\.com\/shorts\/([^?]+)/);
-
-      if (srcMatch && srcMatch[1]) {
-        finalUrl = srcMatch[1];
-      } else if (watchMatch && watchMatch[1]) {
-        finalUrl = `https://www.youtube.com/embed/${watchMatch[1]}`;
-      } else if (shortMatch && shortMatch[1]) {
-        finalUrl = `https://www.youtube.com/embed/${shortMatch[1]}`;
-      } else if (shortsMatch && shortsMatch[1]) {
-        finalUrl = `https://www.youtube.com/embed/${shortsMatch[1]}`;
-      }
-    }
+    const finalUrl = convertToEmbedUrl(newCourse.videoUrl);
     
     addCourse({...newCourse, videoUrl: finalUrl});
     setShowCourseForm(false);
@@ -140,23 +164,7 @@ export function Admin() {
 
   const handleAddVideo = (e: React.FormEvent) => {
     e.preventDefault();
-    let finalUrl = newVideo.url || '';
-    if (finalUrl) {
-      const srcMatch = finalUrl.match(/src=["']([^"']+)["']/);
-      const watchMatch = finalUrl.match(/youtube\.com\/watch\?v=([^&]+)/);
-      const shortMatch = finalUrl.match(/youtu\.be\/([^?]+)/);
-      const shortsMatch = finalUrl.match(/youtube\.com\/shorts\/([^?]+)/);
-
-      if (srcMatch && srcMatch[1]) {
-        finalUrl = srcMatch[1];
-      } else if (watchMatch && watchMatch[1]) {
-        finalUrl = `https://www.youtube.com/embed/${watchMatch[1]}`;
-      } else if (shortMatch && shortMatch[1]) {
-        finalUrl = `https://www.youtube.com/embed/${shortMatch[1]}`;
-      } else if (shortsMatch && shortsMatch[1]) {
-        finalUrl = `https://www.youtube.com/embed/${shortsMatch[1]}`;
-      }
-    }
+    const finalUrl = convertToEmbedUrl(newVideo.url);
     addVideo({...newVideo, url: finalUrl});
     setShowVideoForm(false);
     setNewVideo({ courseId: "", title: "", duration: "", thumbnail: "", url: "", materialUrl: "" });
@@ -751,25 +759,9 @@ export function Admin() {
                           <div className="flex justify-end gap-2 mt-2">
                              <button onClick={() => setEditingCourseId(null)} className="px-3 py-1 text-slate-600 bg-white border rounded">Cancel</button>
                              <button onClick={() => {
-                                let finalUrl = editingCourseData.videoUrl || '';
-                                if (finalUrl) {
-                                  const srcMatch = finalUrl.match(/src=["']([^"']+)["']/);
-                                  const watchMatch = finalUrl.match(/youtube\.com\/watch\?v=([^&]+)/);
-                                  const shortMatch = finalUrl.match(/youtu\.be\/([^?]+)/);
-                                  const shortsMatch = finalUrl.match(/youtube\.com\/shorts\/([^?]+)/);
-
-                                  if (srcMatch && srcMatch[1]) {
-                                    finalUrl = srcMatch[1];
-                                  } else if (watchMatch && watchMatch[1]) {
-                                    finalUrl = `https://www.youtube.com/embed/${watchMatch[1]}`;
-                                  } else if (shortMatch && shortMatch[1]) {
-                                    finalUrl = `https://www.youtube.com/embed/${shortMatch[1]}`;
-                                  } else if (shortsMatch && shortsMatch[1]) {
-                                    finalUrl = `https://www.youtube.com/embed/${shortsMatch[1]}`;
-                                  }
-                                }
-                                updateCourse({...editingCourseData, videoUrl: finalUrl}); 
-                                setEditingCourseId(null); 
+                                const finalUrl = convertToEmbedUrl(editingCourseData.videoUrl);
+                                 updateCourse({...editingCourseData, videoUrl: finalUrl}); 
+                                 setEditingCourseId(null); 
                              }} className="px-3 py-1 text-white bg-sage-600 rounded">Save</button>
                           </div>
                         </div>
@@ -874,25 +866,9 @@ export function Admin() {
                                 <div className="flex justify-end gap-2 mt-auto pt-2">
                                    <button onClick={() => setEditingVideoId(null)} className="px-2 py-1 text-slate-600 bg-white border rounded text-xs">Cancel</button>
                                    <button onClick={() => {
-                                      let finalUrl = editingVideoData.url || '';
-                                      if (finalUrl) {
-                                        const srcMatch = finalUrl.match(/src=["']([^"']+)["']/);
-                                        const watchMatch = finalUrl.match(/youtube\.com\/watch\?v=([^&]+)/);
-                                        const shortMatch = finalUrl.match(/youtu\.be\/([^?]+)/);
-                                        const shortsMatch = finalUrl.match(/youtube\.com\/shorts\/([^?]+)/);
-
-                                        if (srcMatch && srcMatch[1]) {
-                                          finalUrl = srcMatch[1];
-                                        } else if (watchMatch && watchMatch[1]) {
-                                          finalUrl = `https://www.youtube.com/embed/${watchMatch[1]}`;
-                                        } else if (shortMatch && shortMatch[1]) {
-                                          finalUrl = `https://www.youtube.com/embed/${shortMatch[1]}`;
-                                        } else if (shortsMatch && shortsMatch[1]) {
-                                          finalUrl = `https://www.youtube.com/embed/${shortsMatch[1]}`;
-                                        }
-                                      }
-                                      updateVideo({...editingVideoData, url: finalUrl}); 
-                                      setEditingVideoId(null); 
+                                      const finalUrl = convertToEmbedUrl(editingVideoData.url);
+                                       updateVideo({...editingVideoData, url: finalUrl}); 
+                                       setEditingVideoId(null); 
                                    }} className="px-2 py-1 text-white bg-sage-600 rounded text-xs">Save</button>
                                 </div>
                               </div>
@@ -1175,23 +1151,8 @@ export function Admin() {
                              const titleInput = document.getElementById('testimonialTitleInput') as HTMLInputElement;
                              const urlInput = document.getElementById('testimonialVideoInput') as HTMLInputElement;
                              if (titleInput && urlInput && titleInput.value.trim() && urlInput.value.trim()) {
-                               let finalUrl = urlInput.value.trim();
-                               const srcMatch = finalUrl.match(/src=["']([^"']+)["']/);
-                               const watchMatch = finalUrl.match(/youtube\.com\/watch\?v=([^&]+)/);
-                               const shortMatch = finalUrl.match(/youtu\.be\/([^?]+)/);
-                               const shortsMatch = finalUrl.match(/youtube\.com\/shorts\/([^?]+)/);
-
-                               if (srcMatch && srcMatch[1]) {
-                                 finalUrl = srcMatch[1];
-                               } else if (watchMatch && watchMatch[1]) {
-                                 finalUrl = `https://www.youtube.com/embed/${watchMatch[1]}`;
-                               } else if (shortMatch && shortMatch[1]) {
-                                 finalUrl = `https://www.youtube.com/embed/${shortMatch[1]}`;
-                               } else if (shortsMatch && shortsMatch[1]) {
-                                 finalUrl = `https://www.youtube.com/embed/${shortsMatch[1]}`;
-                               }
-
-                               addTestimonialVideo(titleInput.value.trim(), finalUrl);
+                               const finalUrl = convertToEmbedUrl(urlInput.value.trim());
+                                addTestimonialVideo(titleInput.value.trim(), finalUrl);
                                titleInput.value = '';
                                urlInput.value = '';
                              } else {
@@ -1251,23 +1212,8 @@ export function Admin() {
                            onClick={() => {
                              const urlInput = document.getElementById('founderVideoInput') as HTMLInputElement;
                              if (urlInput && urlInput.value.trim()) {
-                               let finalUrl = urlInput.value.trim();
-                               const srcMatch = finalUrl.match(/src=["']([^"']+)["']/);
-                               const watchMatch = finalUrl.match(/youtube\.com\/watch\?v=([^&]+)/);
-                               const shortMatch = finalUrl.match(/youtu\.be\/([^?]+)/);
-                               const shortsMatch = finalUrl.match(/youtube\.com\/shorts\/([^?]+)/);
-
-                               if (srcMatch && srcMatch[1]) {
-                                 finalUrl = srcMatch[1];
-                               } else if (watchMatch && watchMatch[1]) {
-                                 finalUrl = `https://www.youtube.com/embed/${watchMatch[1]}`;
-                               } else if (shortMatch && shortMatch[1]) {
-                                 finalUrl = `https://www.youtube.com/embed/${shortMatch[1]}`;
-                               } else if (shortsMatch && shortsMatch[1]) {
-                                 finalUrl = `https://www.youtube.com/embed/${shortsMatch[1]}`;
-                               }
-
-                               updateFounderVideo(finalUrl);
+                               const finalUrl = convertToEmbedUrl(urlInput.value.trim());
+                                updateFounderVideo(finalUrl);
                              } else {
                                updateFounderVideo("");
                              }
@@ -1294,23 +1240,8 @@ export function Admin() {
                            onClick={() => {
                              const urlInput = document.getElementById('aboutVideoInput') as HTMLInputElement;
                              if (urlInput && urlInput.value.trim()) {
-                               let finalUrl = urlInput.value.trim();
-                               const srcMatch = finalUrl.match(/src=["']([^"']+)["']/);
-                               const watchMatch = finalUrl.match(/youtube\.com\/watch\?v=([^&]+)/);
-                               const shortMatch = finalUrl.match(/youtu\.be\/([^?]+)/);
-                               const shortsMatch = finalUrl.match(/youtube\.com\/shorts\/([^?]+)/);
-
-                               if (srcMatch && srcMatch[1]) {
-                                 finalUrl = srcMatch[1];
-                               } else if (watchMatch && watchMatch[1]) {
-                                 finalUrl = `https://www.youtube.com/embed/${watchMatch[1]}`;
-                               } else if (shortMatch && shortMatch[1]) {
-                                 finalUrl = `https://www.youtube.com/embed/${shortMatch[1]}`;
-                               } else if (shortsMatch && shortsMatch[1]) {
-                                 finalUrl = `https://www.youtube.com/embed/${shortsMatch[1]}`;
-                               }
-
-                               updateAboutVideo(finalUrl);
+                               const finalUrl = convertToEmbedUrl(urlInput.value.trim());
+                                updateAboutVideo(finalUrl);
                              } else {
                                updateAboutVideo("");
                              }

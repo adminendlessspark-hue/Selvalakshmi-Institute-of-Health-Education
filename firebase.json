@@ -1,5 +1,12 @@
 {
-  "firestore": {
-    "rules": "firestore.rules"
-  }
+  "firestore": [
+    {
+      "database": "(default)",
+      "rules": "firestore.rules"
+    },
+    {
+      "database": "ai-studio-selvalakshmifoun-06cf7884-eb4f-48b6-b930-3989fc202d2d",
+      "rules": "firestore.rules"
+    }
+  ]
 }
