@@ -23,6 +23,8 @@ export function Appointment() {
   const [generatedMeetLink, setGeneratedMeetLink] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [useUpiFallback, setUseUpiFallback] = useState(false);
+  const [upiRefNo, setUpiRefNo] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -52,6 +54,45 @@ export function Appointment() {
     setStep(2);
   };
 
+  const submitAppointment = async (statusToSet: "pending" | "confirmed", paymentReference: string) => {
+    const meetLink = appointmentSettings?.defaultMeetLink || "";
+    try {
+      const result = await addAppointment({
+        ...formData,
+        phone: `+91 ${formData.phone}`,
+        status: statusToSet,
+        meetLink: meetLink,
+        problem: formData.problem ? `${formData.problem} (Payment: ${paymentReference})` : `Payment: ${paymentReference}`,
+      });
+
+      if (result && result.startsWith("APT-")) {
+        setSubmittedId(result);
+        setGeneratedMeetLink(meetLink);
+        setStep(3);
+
+        const customerPhone = formData.phone.replace(/[^0-9]/g, '');
+        const finalMeetLink = meetLink || "Link will be shared by Admin";
+        const message = `Hello ${formData.name},\n\nYour consultation appointment is confirmed for ${formData.date} at ${formData.time}.\n\nPlease join using this Google Meet link: ${finalMeetLink}\n\nFrom: jcmpselvalakshmifoundation@gmail.com`;
+
+        window.open(`https://wa.me/91${customerPhone}?text=${encodeURIComponent(message)}`, '_blank');
+        
+        if (formData.email) {
+          const subject = `Consultation Appointment Confirmation - ${formData.date} ${formData.time}`;
+          setTimeout(() => {
+            window.open(`mailto:${formData.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`, '_blank');
+          }, 500);
+        }
+      } else {
+        setErrorMsg(`Failed to submit the appointment: ${result || 'Unknown error'}. Please try again.`);
+        setStep(1);
+      }
+    } catch (err) {
+      setErrorMsg("An unexpected error occurred. Please try again.");
+      console.error(err);
+      setStep(1);
+    }
+  };
+
   const handleConfirmPayment = async () => {
     setIsSubmitting(true);
     setErrorMsg(null);
@@ -61,89 +102,72 @@ export function Appointment() {
         throw new Error("Razorpay SDK failed to load. Are you online?");
       }
 
-      const response = await fetch(`${API_BASE}/api/create-razorpay-order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: fee, title: "Consultation Fee" }),
-      });
+      let rzpKey = appointmentSettings?.razorpayKeyId;
+      let orderId = null;
+      let orderAmount = fee * 100;
+      let orderCurrency = "INR";
 
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Payment gateway returned an invalid response. If you are in the preview environment, please open this application in a new tab to complete authorization.");
+      // Try to fetch key from server if not configured in Firestore
+      if (!rzpKey) {
+        try {
+          const keyResponse = await fetch(`${API_BASE}/api/razorpay-key`);
+          const keyContentType = keyResponse.headers.get("content-type");
+          if (keyResponse.ok && keyContentType && keyContentType.includes("application/json")) {
+            const keyData = await keyResponse.json();
+            rzpKey = keyData.key;
+          }
+        } catch (e) {
+          console.warn("Could not fetch Razorpay key from server", e);
+        }
       }
 
-      const orderData = await response.json();
-      if (!response.ok) {
-        throw new Error(orderData.error || "Failed to create Razorpay order");
+      // Try to create order
+      try {
+        const response = await fetch(`${API_BASE}/api/create-razorpay-order`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: fee, title: "Consultation Fee" }),
+        });
+
+        const contentType = response.headers.get("content-type");
+        if (response.ok && contentType && contentType.includes("application/json")) {
+          const orderData = await response.json();
+          orderId = orderData.id;
+          orderAmount = orderData.amount;
+          orderCurrency = orderData.currency;
+        }
+      } catch (e) {
+        console.warn("Failed to create order on server, using direct client checkout", e);
       }
 
-      const keyResponse = await fetch(`${API_BASE}/api/razorpay-key`);
-      const keyContentType = keyResponse.headers.get("content-type");
-      if (!keyContentType || !keyContentType.includes("application/json")) {
-        throw new Error("Failed to load payment configuration. If you are in the preview environment, please open this application in a new tab to complete authorization.");
+      // If we still do not have a Razorpay key, enable UPI fallback
+      if (!rzpKey) {
+        setUseUpiFallback(true);
+        throw new Error("Razorpay payment gateway is not configured. Please use the GPay / PhonePe / UPI payment option below.");
       }
 
-      const keyData = await keyResponse.json();
-      if (!keyData.key) {
-        throw new Error("Razorpay Key ID not configured on server.");
-      }
-
-      const options = {
-        key: keyData.key,
-        amount: orderData.amount,
-        currency: orderData.currency,
+      const options: any = {
+        key: rzpKey,
+        amount: orderAmount,
+        currency: orderCurrency,
         name: "Selvalakshmi Foundation",
         description: "Consultation Appointment",
-        order_id: orderData.id,
-        handler: async function (response: any) {
-          // Payment successful, proceed to create appointment
-          const meetLink = appointmentSettings?.defaultMeetLink || "";
-          const statusToSet = "confirmed";
-          
-          try {
-            const result = await addAppointment({
-              ...formData,
-              phone: `+91 ${formData.phone}`,
-              status: statusToSet,
-              meetLink: meetLink,
-            });
-
-            if (result && result.startsWith("APT-")) {
-              setSubmittedId(result);
-              setGeneratedMeetLink(meetLink);
-              setStep(3);
-
-              const customerPhone = formData.phone.replace(/[^0-9]/g, '');
-              const finalMeetLink = meetLink || "Link will be shared by Admin";
-              const message = `Hello ${formData.name},\n\nYour consultation appointment is confirmed for ${formData.date} at ${formData.time}.\n\nPlease join using this Google Meet link: ${finalMeetLink}\n\nFrom: jcmpselvalakshmifoundation@gmail.com`;
-
-              window.open(`https://wa.me/91${customerPhone}?text=${encodeURIComponent(message)}`, '_blank');
-              
-              if (formData.email) {
-                const subject = `Consultation Appointment Confirmation - ${formData.date} ${formData.time}`;
-                setTimeout(() => {
-                  window.open(`mailto:${formData.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`, '_blank');
-                }, 500);
-              }
-            } else {
-              setErrorMsg(`Failed to submit the appointment: ${result || 'Unknown error'}. Please try again.`);
-              setStep(1);
-            }
-          } catch (err) {
-            setErrorMsg("An unexpected error occurred. Please try again.");
-            console.error(err);
-            setStep(1);
-          }
-        },
         prefill: {
           name: formData.name,
           email: formData.email,
           contact: `+91${formData.phone}`
         },
         theme: {
-          color: "#059669" // sage-600 approx
+          color: "#059669"
+        },
+        handler: async function (response: any) {
+          await submitAppointment("confirmed", `Razorpay Payment ID: ${response.razorpay_payment_id}`);
         }
       };
+
+      if (orderId) {
+        options.order_id = orderId;
+      }
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (response: any){
@@ -256,34 +280,104 @@ export function Appointment() {
           </button>
           
           <h2 className="text-3xl font-bold text-slate-900 mb-2 mt-4">Complete Payment</h2>
-          <p className="text-slate-600 mb-8">
+          <p className="text-slate-600 mb-6">
             Please pay the consultation fee of <strong>₹{fee}</strong> to confirm your appointment.
           </p>
 
+          <div className="flex border-b border-slate-150 mb-6 justify-center">
+            <button 
+              onClick={() => { setUseUpiFallback(false); setErrorMsg(null); }}
+              className={`pb-3 px-6 font-semibold text-sm transition-all border-b-2 ${!useUpiFallback ? 'border-sage-600 text-sage-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            >
+              Razorpay Secure Checkout
+            </button>
+            <button 
+              onClick={() => { setUseUpiFallback(true); setErrorMsg(null); }}
+              className={`pb-3 px-6 font-semibold text-sm transition-all border-b-2 ${useUpiFallback ? 'border-sage-600 text-sage-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            >
+              Direct UPI / GPay QR Payment
+            </button>
+          </div>
+
           {errorMsg && (
-            <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
+            <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm text-left">
               {errorMsg}
             </div>
           )}
 
-          <div className="space-y-4 max-w-sm mx-auto">
-            <button
-              onClick={handleConfirmPayment}
-              disabled={isSubmitting}
-              className="w-full bg-sage-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-sage-700 transition flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-lg shadow-sm"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" /> Processing Payment...
-                </>
+          {!useUpiFallback ? (
+            <div className="space-y-4 max-w-sm mx-auto">
+              <button
+                onClick={handleConfirmPayment}
+                disabled={isSubmitting}
+                className="w-full bg-sage-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-sage-700 transition flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-lg shadow-sm"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" /> Processing Payment...
+                  </>
+                ) : (
+                  "Pay with Razorpay"
+                )}
+              </button>
+              <p className="text-sm text-slate-500">
+                Clicking this will securely open the Razorpay payment window.
+              </p>
+              <p className="text-xs text-slate-400 mt-2">
+                If payment fails or "Failed to fetch" appears, switch to the <strong>Direct UPI / GPay QR Payment</strong> tab above to complete booking.
+              </p>
+            </div>
+          ) : (
+            <div className="max-w-md mx-auto">
+              {gpayQrUrl ? (
+                <div className="flex flex-col items-center p-4 border border-slate-100 rounded-2xl bg-slate-50 mb-4">
+                  <p className="text-sm text-slate-600 font-medium mb-3">Scan the QR code to pay using GPay / PhonePe / Paytm / BHIM</p>
+                  <img src={gpayQrUrl} alt="GPay QR Code" className="w-48 h-48 object-contain rounded-lg border border-slate-200 p-2 bg-white" referrerPolicy="no-referrer" />
+                  <p className="text-xs text-slate-500 mt-2">Pay exactly ₹{fee} to the foundation</p>
+                </div>
               ) : (
-                "Pay with Razorpay"
+                <div className="flex flex-col items-center p-4 border border-slate-100 rounded-2xl bg-slate-50 mb-4">
+                  <p className="text-sm text-slate-600 font-medium mb-2">Pay via GPay / PhonePe / UPI ID</p>
+                  <p className="text-sage-700 font-mono font-bold text-lg select-all">jcmpselvalakshmifoundation@gmail.com</p>
+                  {whatsappNumber && <p className="text-slate-700 text-sm mt-1 font-medium">UPI Phone Number: +91 {whatsappNumber}</p>}
+                  <p className="text-xs text-slate-500 mt-2">Please send exactly ₹{fee} and keep the reference ID handy</p>
+                </div>
               )}
-            </button>
-            <p className="text-sm text-slate-500">
-              Clicking this will securely open the Razorpay payment window.
-            </p>
-          </div>
+
+              <div className="mt-4 text-left">
+                <label className="block text-sm font-medium text-slate-700 mb-2 font-semibold">UPI Transaction Reference ID / UTR *</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. 12-digit number from payment receipt"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-sage-500 text-center font-mono font-bold tracking-wide"
+                  value={upiRefNo}
+                  onChange={e => setUpiRefNo(e.target.value)}
+                />
+                <button 
+                  onClick={async () => {
+                    if (!upiRefNo.trim()) {
+                      setErrorMsg("Please enter your payment reference transaction ID or your phone number used for payment.");
+                      return;
+                    }
+                    setIsSubmitting(true);
+                    setErrorMsg(null);
+                    await submitAppointment("pending", `Manual UPI Reference: ${upiRefNo}`);
+                    setIsSubmitting(false);
+                  }}
+                  disabled={isSubmitting}
+                  className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold transition shadow-sm text-lg flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" /> Submitting booking...
+                    </>
+                  ) : (
+                    "I Have Paid, Submit Booking"
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

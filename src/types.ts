@@ -43,6 +43,7 @@ export type Student = {
   country?: string;
   registrationDate: string;
   status: "pending" | "approved" | "rejected";
+  paymentReference?: string;
   quizResults?: Record<string, QuizResult>;
 };
 
@@ -85,4 +86,5 @@ export type AppointmentSettings = {
   fee: number;
   slots: AppointmentSlot[];
   defaultMeetLink?: string;
+  razorpayKeyId?: string;
 };

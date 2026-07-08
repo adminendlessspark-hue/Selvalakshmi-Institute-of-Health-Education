@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { QRCodeSVG } from "qrcode.react";
 import { API_BASE } from "../config";
+import { Loader2, ArrowLeft } from "lucide-react";
 
 const loadRazorpay = () => {
   return new Promise((resolve) => {
@@ -64,12 +65,15 @@ const translations = {
 };
 
 export function Register() {
-  const { courses, addStudent, gpayQrUrl } = useStore();
+  const { courses, addStudent, gpayQrUrl, appointmentSettings, whatsappNumber, students, updateStudent } = useStore();
   const [searchParams] = useSearchParams();
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [createdStudentId, setCreatedStudentId] = useState<string | null>(null);
   const [language, setLanguage] = useState<"en" | "ta">("en");
   const [countryCode, setCountryCode] = useState("+91");
+  const [useUpiFallback, setUseUpiFallback] = useState(false);
+  const [upiRefNo, setUpiRefNo] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const t = translations[language];
 
   const [formData, setFormData] = useState({
@@ -100,90 +104,138 @@ export function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const id = await addStudent({...formData, phone: `${countryCode}${formData.phone}`});
-    setCreatedStudentId(id);
-
-    // Check if course requires payment
-    const selectedCourse = courses.find(c => c.id === formData.courseId);
-    const feeString = selectedCourse?.fee || "";
-    const isFree = feeString.toLowerCase() === 'free' || feeString === '0' || feeString === '';
-    
-    if (!isFree) {
-        try {
-          setLoadingPayment(true);
-          const feeAmountMatch = feeString.match(/\d+(\.\d+)?/);
-          // Amount in rupees for Razorpay
-          const amountInRupees = feeAmountMatch ? parseFloat(feeAmountMatch[0]) : 50;
-          
-          const isLoaded = await loadRazorpay();
-          if (!isLoaded) throw new Error("Razorpay SDK not loaded");
-
-          const response = await fetch(`${API_BASE}/api/create-razorpay-order`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              amount: amountInRupees, 
-              title: `Registration for ${selectedCourse?.title || "Course"}` 
-            }),
-          });
-          
-          const contentType = response.headers.get("content-type");
-          if (!contentType || !contentType.includes("application/json")) {
-            throw new Error("Payment gateway returned an invalid response. If you are in the preview environment, please open this application in a new tab to complete authorization.");
-          }
-
-          const orderData = await response.json();
-          if (!response.ok) throw new Error(orderData.error || "Failed to create session");
-          
-          const keyResponse = await fetch(`${API_BASE}/api/razorpay-key`);
-          const keyContentType = keyResponse.headers.get("content-type");
-          if (!keyContentType || !keyContentType.includes("application/json")) {
-            throw new Error("Failed to load payment configuration. If you are in the preview environment, please open this application in a new tab to complete authorization.");
-          }
-
-          const keyData = await keyResponse.json();
-          if (!keyData.key) throw new Error("Razorpay Key ID not configured");
-          
-          const options = {
-            key: keyData.key,
-            amount: orderData.amount,
-            currency: orderData.currency,
-            name: "Selvalakshmi Foundation",
-            description: `Registration for ${selectedCourse?.title || "Course"}`,
-            order_id: orderData.id,
-            handler: function (response: any) {
-               setIsSubmitted(true);
-            },
-            prefill: {
-              name: `${formData.firstName} ${formData.lastName}`,
-              email: formData.email,
-              contact: `${countryCode}${formData.phone}`
-            },
-            theme: {
-              color: "#0d9488"
-            }
-          };
-
-          const rzp = new (window as any).Razorpay(options);
-          rzp.on('payment.failed', function (response: any){
-            alert(`Payment initialization failed: ${response.error.description}. Your registration was saved, but payment is pending.`);
-            setIsSubmitted(true);
-          });
-          rzp.open();
-
-        } catch (error: any) {
-          console.error("Payment error:", error);
-          alert(`Payment initialization failed: ${error.message}. Your registration was saved, but payment is pending.`);
-          setIsSubmitted(true);
-        } finally {
-          setLoadingPayment(false);
+    setErrorMsg(null);
+    try {
+      const id = await addStudent({...formData, phone: `${countryCode}${formData.phone}`});
+      if (id) {
+        setCreatedStudentId(id);
+        
+        // Check if course requires payment
+        const selectedCourse = courses.find(c => c.id === formData.courseId);
+        const feeString = selectedCourse?.fee || "";
+        const isFree = feeString.toLowerCase() === 'free' || feeString === '0' || feeString === '';
+        
+        if (!isFree) {
+          setStep(2); // Go to step 2: Complete Payment
+        } else {
+          setStep(3); // Go to step 3: Success Screen
         }
-    } else {
-        setIsSubmitted(true);
+      } else {
+        setErrorMsg("Failed to register. Please check your network connection and try again.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg("An unexpected error occurred. Please try again.");
     }
   };
 
-  if (isSubmitted) {
+  const submitCoursePayment = async (paymentRef: string) => {
+    if (!createdStudentId) return;
+    const existingStudent = students.find(s => s.id === createdStudentId);
+    if (existingStudent) {
+      await updateStudent({
+        ...existingStudent,
+        paymentReference: paymentRef
+      });
+    }
+    setStep(3);
+  };
+
+  const handleConfirmPayment = async () => {
+    setLoadingPayment(true);
+    setErrorMsg(null);
+    try {
+      const isLoaded = await loadRazorpay();
+      if (!isLoaded) {
+        throw new Error("Razorpay SDK failed to load. Are you online?");
+      }
+
+      const selectedCourse = courses.find(c => c.id === formData.courseId);
+      const feeString = selectedCourse?.fee || "";
+      const feeAmountMatch = feeString.match(/\d+(\.\d+)?/);
+      const fee = feeAmountMatch ? parseFloat(feeAmountMatch[0]) : 50;
+
+      let rzpKey = appointmentSettings?.razorpayKeyId;
+      let orderId = null;
+      let orderAmount = fee * 100;
+      let orderCurrency = "INR";
+
+      // Try to fetch key from server if not configured in Firestore
+      if (!rzpKey) {
+        try {
+          const keyResponse = await fetch(`${API_BASE}/api/razorpay-key`);
+          const keyContentType = keyResponse.headers.get("content-type");
+          if (keyResponse.ok && keyContentType && keyContentType.includes("application/json")) {
+            const keyData = await keyResponse.json();
+            rzpKey = keyData.key;
+          }
+        } catch (e) {
+          console.warn("Could not fetch Razorpay key from server", e);
+        }
+      }
+
+      // Try to create order
+      try {
+        const response = await fetch(`${API_BASE}/api/create-razorpay-order`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: fee, title: `Registration for ${selectedCourse?.title || "Course"}` }),
+        });
+
+        const contentType = response.headers.get("content-type");
+        if (response.ok && contentType && contentType.includes("application/json")) {
+          const orderData = await response.json();
+          orderId = orderData.id;
+          orderAmount = orderData.amount;
+          orderCurrency = orderData.currency;
+        }
+      } catch (e) {
+        console.warn("Failed to create order on server, using direct client checkout", e);
+      }
+
+      // If we still do not have a Razorpay key, enable UPI fallback
+      if (!rzpKey) {
+        setUseUpiFallback(true);
+        throw new Error("Razorpay payment gateway is not configured. Please use the GPay / PhonePe / UPI payment option below.");
+      }
+
+      const options: any = {
+        key: rzpKey,
+        amount: orderAmount,
+        currency: orderCurrency,
+        name: "Selvalakshmi Foundation",
+        description: `Registration for ${selectedCourse?.title || "Course"}`,
+        prefill: {
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          contact: `${countryCode}${formData.phone}`
+        },
+        theme: {
+          color: "#0d9488"
+        },
+        handler: async function (response: any) {
+          await submitCoursePayment(`Razorpay Payment ID: ${response.razorpay_payment_id}`);
+        }
+      };
+
+      if (orderId) {
+        options.order_id = orderId;
+      }
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (response: any){
+        setErrorMsg(`Payment failed: ${response.error.description}`);
+      });
+      rzp.open();
+    } catch (error: any) {
+      console.error("Payment error:", error);
+      setErrorMsg(error.message || "An error occurred during payment checkout. Please try again or use direct UPI payment.");
+    } finally {
+      setLoadingPayment(false);
+    }
+  };
+
+  if (step === 3) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-sm border border-sage-100 text-center relative">
@@ -245,6 +297,131 @@ export function Register() {
           >
             {t.goToLogin}
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 2) {
+    const selectedCourseObj = courses.find((c) => c.id === formData.courseId);
+    const feeString = selectedCourseObj?.fee || "";
+    const feeAmountMatch = feeString.match(/\d+(\.\d+)?/);
+    const fee = feeAmountMatch ? parseFloat(feeAmountMatch[0]) : 50;
+
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-sm border border-sage-100 text-center relative">
+          <button 
+            type="button"
+            onClick={() => setStep(1)}
+            className="absolute top-6 left-6 text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-medium transition"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back
+          </button>
+          
+          <h2 className="text-3xl font-bold text-slate-900 mb-2 mt-4 font-serif">Complete Payment</h2>
+          <p className="text-slate-600 mb-6">
+            Please pay the registration fee of <strong>{feeString.includes('₹') ? feeString : `₹${feeString}`}</strong> to complete registration for <strong>{selectedCourseObj?.title}</strong>.
+          </p>
+
+          <div className="flex border-b border-slate-150 mb-6 justify-center">
+            <button 
+              type="button"
+              onClick={() => { setUseUpiFallback(false); setErrorMsg(null); }}
+              className={`pb-3 px-4 font-semibold text-sm transition-all border-b-2 ${!useUpiFallback ? 'border-sage-600 text-sage-600 font-bold' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            >
+              Razorpay Secure Checkout
+            </button>
+            <button 
+              type="button"
+              onClick={() => { setUseUpiFallback(true); setErrorMsg(null); }}
+              className={`pb-3 px-4 font-semibold text-sm transition-all border-b-2 ${useUpiFallback ? 'border-sage-600 text-sage-600 font-bold' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            >
+              Direct UPI / GPay QR
+            </button>
+          </div>
+
+          {errorMsg && (
+            <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm text-left">
+              {errorMsg}
+            </div>
+          )}
+
+          {!useUpiFallback ? (
+            <div className="space-y-4 max-w-sm mx-auto">
+              <button
+                type="button"
+                onClick={handleConfirmPayment}
+                disabled={loadingPayment}
+                className="w-full bg-sage-600 text-white px-6 py-4 rounded-xl font-bold hover:bg-sage-700 transition flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-lg shadow-sm"
+              >
+                {loadingPayment ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" /> Processing Payment...
+                  </>
+                ) : (
+                  "Pay with Razorpay"
+                )}
+              </button>
+              <p className="text-sm text-slate-500">
+                Clicking this will securely open the Razorpay payment window.
+              </p>
+              <p className="text-xs text-slate-400 mt-2">
+                If payment fails or "Failed to fetch" appears, switch to the <strong>Direct UPI / GPay QR</strong> tab above to complete booking.
+              </p>
+            </div>
+          ) : (
+            <div className="max-w-md mx-auto text-left">
+              {gpayQrUrl ? (
+                <div className="flex flex-col items-center p-4 border border-slate-100 rounded-2xl bg-slate-50 mb-4">
+                  <p className="text-sm text-slate-600 font-medium mb-3 text-center">Scan the QR code to pay using GPay / PhonePe / Paytm / BHIM</p>
+                  <img src={gpayQrUrl} alt="GPay QR Code" className="w-48 h-48 object-contain rounded-lg border border-slate-200 p-2 bg-white" referrerPolicy="no-referrer" />
+                  <p className="text-xs text-slate-500 mt-2">Pay exactly {feeString.includes('₹') ? feeString : `₹${feeString}`} to the foundation</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center p-4 border border-slate-100 rounded-2xl bg-slate-50 mb-4 text-center">
+                  <p className="text-sm text-slate-600 font-medium mb-2 font-semibold">Pay via GPay / PhonePe / UPI ID</p>
+                  <p className="text-sage-700 font-mono font-bold text-lg select-all bg-white py-1 px-3 border rounded-lg shadow-sm">mudrasmp@oksbi</p>
+                  {whatsappNumber && <p className="text-slate-700 text-sm mt-2 font-medium">UPI Phone Number: +91 {whatsappNumber}</p>}
+                  <p className="text-xs text-slate-500 mt-2">Please send exactly {feeString.includes('₹') ? feeString : `₹${feeString}`} and keep the reference ID handy</p>
+                </div>
+              )}
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2 font-semibold">UPI Transaction Reference ID / UTR *</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. 12-digit number from payment receipt"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-sage-500 text-center font-mono font-bold tracking-wide"
+                  value={upiRefNo}
+                  onChange={e => setUpiRefNo(e.target.value)}
+                />
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    if (!upiRefNo.trim()) {
+                      setErrorMsg("Please enter your payment reference transaction ID.");
+                      return;
+                    }
+                    setLoadingPayment(true);
+                    setErrorMsg(null);
+                    await submitCoursePayment(`Manual UPI Reference: ${upiRefNo}`);
+                    setLoadingPayment(false);
+                  }}
+                  disabled={loadingPayment}
+                  className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold transition shadow-sm text-lg flex items-center justify-center gap-2"
+                >
+                  {loadingPayment ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" /> Submitting registration...
+                    </>
+                  ) : (
+                    "I Have Paid, Submit Registration"
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -432,43 +609,31 @@ export function Register() {
             </div>
           </div>
 
+          {errorMsg && (
+            <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm text-left">
+              {errorMsg}
+            </div>
+          )}
+
           {(() => {
             const selectedCourse = courses.find(c => c.id === formData.courseId);
             const feeString = selectedCourse?.fee || "";
             const isFree = feeString.toLowerCase() === 'free' || feeString === '0' || feeString === '';
-            const feeAmountMatch = feeString.match(/\d+(\.\d+)?/);
-            const feeAmount = feeAmountMatch ? feeAmountMatch[0] : null;
-
-            // Only show payment section if a course is selected and it has a fee
-            if (!formData.courseId || isFree) {
-              return null;
-            }
-
-            const upiId = "mudrasmp@oksbi";
-            const upiUrl = `upi://pay?pa=${upiId}&pn=Selvalakshmi%20Institute%20of%20Health%20Education${feeAmount ? `&am=${feeAmount}` : ''}&cu=INR`;
+            const isPaid = !isFree;
+            const buttonText = isPaid 
+              ? (language === 'en' ? `Proceed to Payment (${feeString.includes('₹') ? feeString : `₹${feeString}`})` : `பதிவு கட்டணம் செலுத்தவும் (${feeString.includes('₹') ? feeString : `₹${feeString}`})`)
+              : t.submitButton;
 
             return (
-              <div className="mb-8 p-6 bg-sage-50 border border-sage-200 rounded-xl flex flex-col items-center">
-                <h3 className="font-bold text-sage-900 mb-2 text-center text-lg">{t.paymentTitle}</h3>
-                <div className="bg-white px-4 py-2 rounded-lg border border-sage-100 mb-4 font-medium text-sage-800 shadow-sm">
-                  {t.feeLabel}: {feeString.includes('₹') ? feeString : `₹${feeString}`}
-                </div>
-                <p className="text-sm text-slate-600 mb-2 text-center">Standard Card Payment / Net Banking via Secure Gateway.</p>
-                <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                  <span>Processed securely</span>
-                </div>
-              </div>
+              <button
+                type="submit"
+                disabled={loadingPayment}
+                className="w-full bg-sage-600 text-white font-medium py-3.5 rounded-md hover:bg-sage-700 transition shadow-sm disabled:bg-sage-400 flex justify-center items-center gap-2 text-base font-semibold"
+              >
+                {loadingPayment ? "Processing..." : buttonText}
+              </button>
             );
           })()}
-
-          <button
-            type="submit"
-            disabled={loadingPayment}
-            className="w-full bg-sage-600 text-white font-medium py-3 rounded-md hover:bg-sage-700 transition shadow-sm disabled:bg-sage-400 flex justify-center items-center gap-2"
-          >
-            {loadingPayment ? "Redirecting to Payment Gateway..." : t.submitButton}
-          </button>
           <p className="text-xs text-center text-slate-500 mt-4">
             {t.terms}
           </p>

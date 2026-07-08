@@ -99,6 +99,18 @@ export function Admin() {
   const [selectedCourseForTemplate, setSelectedCourseForTemplate] = useState<string>("");
   const [shareTemplateText, setShareTemplateText] = useState<string>(`🌟 *Welcome to Our Platform!* 🌟\n\nExplore our latest courses and sign up today!\n\n🔗 *Visit:*\nhttps://selvalakshmihealtheducation.in`);
 
+  const [feeInput, setFeeInput] = useState<number | "">(appointmentSettings?.fee ?? 100);
+  const [meetLinkInput, setMeetLinkInput] = useState<string>(appointmentSettings?.defaultMeetLink || "");
+  const [razorpayKeyIdInput, setRazorpayKeyIdInput] = useState<string>(appointmentSettings?.razorpayKeyId || "");
+
+  React.useEffect(() => {
+    if (appointmentSettings) {
+      setFeeInput(appointmentSettings.fee);
+      setMeetLinkInput(appointmentSettings.defaultMeetLink || "");
+      setRazorpayKeyIdInput(appointmentSettings.razorpayKeyId || "");
+    }
+  }, [appointmentSettings]);
+
   const handleAddCourse = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourse.id) newCourse.id = newCourse.title.toLowerCase().replace(/\s+/g, '-');
@@ -422,6 +434,11 @@ export function Admin() {
                               <td className="p-4">
                                 <div>{student.email}</div>
                                 <div className="text-slate-500">{student.phone}</div>
+                                {student.paymentReference && (
+                                  <div className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded mt-1 font-mono inline-block break-all max-w-[200px]">
+                                    {student.paymentReference}
+                                  </div>
+                                )}
                               </td>
                               <td className="p-4">{course ? course.title : student.courseId}</td>
                               <td className="p-4 text-slate-500 whitespace-nowrap">{new Date(student.registrationDate).toLocaleDateString()}</td>
@@ -458,15 +475,15 @@ export function Admin() {
             {activeTab === "appointments" && (
               <div className="space-y-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-sage-200">
-                  <h3 className="font-bold text-slate-900 mb-4">Appointment Settings</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <h3 className="font-bold text-slate-900 mb-4 text-lg">Appointment & Payment Settings</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Consultation Fee (₹)</label>
                       <input 
                         type="number" 
                         className="w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-sage-500 outline-none" 
-                        value={appointmentSettings?.fee ?? 100} 
-                        onChange={e => updateAppointmentSettings({ ...(appointmentSettings || { slots: [] }), fee: parseInt(e.target.value) || 0 })} 
+                        value={feeInput} 
+                        onChange={e => setFeeInput(e.target.value === "" ? "" : parseInt(e.target.value) || 0)} 
                       />
                     </div>
                     <div>
@@ -475,32 +492,63 @@ export function Admin() {
                         type="url" 
                         placeholder="https://meet.google.com/..."
                         className="w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-sage-500 outline-none" 
-                        value={appointmentSettings?.defaultMeetLink || ""} 
-                        onChange={e => updateAppointmentSettings({ ...(appointmentSettings || { slots: [], fee: 100 }), defaultMeetLink: e.target.value })} 
+                        value={meetLinkInput} 
+                        onChange={e => setMeetLinkInput(e.target.value)} 
                       />
                       <p className="text-xs text-slate-500 mt-1">If set, this link is automatically sent to patients upon booking.</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Add Available Slot</label>
-                      <div className="flex gap-2">
-                        <input type="date" id="newSlotDate" className="px-3 py-2 border rounded-md outline-none" />
-                        <input type="time" id="newSlotTime" className="px-3 py-2 border rounded-md outline-none" />
-                        <button 
-                          onClick={() => {
-                            const d = (document.getElementById("newSlotDate") as HTMLInputElement).value;
-                            const t = (document.getElementById("newSlotTime") as HTMLInputElement).value;
-                            if (d && t) {
-                              updateAppointmentSettings({
-                                ...(appointmentSettings || { fee: 100 }),
-                                slots: [...(appointmentSettings?.slots || []), { date: d, time: t }]
-                              });
-                            }
-                          }}
-                          className="bg-sage-600 text-white px-4 py-2 rounded-md hover:bg-sage-700 transition whitespace-nowrap"
-                        >
-                          Add
-                        </button>
-                      </div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Razorpay Key ID (For Custom Domain Payments)</label>
+                      <input 
+                        type="text" 
+                        placeholder="rzp_live_..."
+                        className="w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-sage-500 outline-none" 
+                        value={razorpayKeyIdInput} 
+                        onChange={e => setRazorpayKeyIdInput(e.target.value)} 
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Enter your live Razorpay Key ID here to accept payments on your custom domain.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-start mb-6 border-b pb-6 border-slate-100">
+                    <button
+                      onClick={async () => {
+                        await updateAppointmentSettings({
+                          ...(appointmentSettings || { slots: [] }),
+                          fee: typeof feeInput === "number" ? feeInput : 100,
+                          defaultMeetLink: meetLinkInput,
+                          razorpayKeyId: razorpayKeyIdInput
+                        });
+                        alert("Settings saved successfully!");
+                      }}
+                      className="bg-sage-600 text-white px-5 py-2.5 rounded-md font-medium hover:bg-sage-700 transition"
+                    >
+                      Save Settings
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-semibold text-slate-900 text-sm">Add Available Slot</h4>
+                    <div className="flex gap-2 max-w-md">
+                      <input type="date" id="newSlotDate" className="px-3 py-2 border rounded-md outline-none text-sm" />
+                      <input type="time" id="newSlotTime" className="px-3 py-2 border rounded-md outline-none text-sm" />
+                      <button 
+                        onClick={() => {
+                          const d = (document.getElementById("newSlotDate") as HTMLInputElement).value;
+                          const t = (document.getElementById("newSlotTime") as HTMLInputElement).value;
+                          if (d && t) {
+                            updateAppointmentSettings({
+                              ...(appointmentSettings || { fee: typeof feeInput === "number" ? feeInput : 100, defaultMeetLink: meetLinkInput, razorpayKeyId: razorpayKeyIdInput }),
+                              slots: [...(appointmentSettings?.slots || []), { date: d, time: t }]
+                            });
+                            (document.getElementById("newSlotDate") as HTMLInputElement).value = "";
+                            (document.getElementById("newSlotTime") as HTMLInputElement).value = "";
+                          }
+                        }}
+                        className="bg-sage-600 text-white px-4 py-2 rounded-md hover:bg-sage-700 transition whitespace-nowrap text-sm font-medium"
+                      >
+                        Add Slot
+                      </button>
                     </div>
                   </div>
                   
