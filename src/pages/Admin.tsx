@@ -61,7 +61,7 @@ const convertToEmbedUrl = (input: string | null | undefined): string => {
 export function Admin() {
   const { 
     courses, students, appointments, videos, logoUrl, heroImages, heroOverlayColor, heroOverlayOpacity, gpayQrUrl, testimonialVideos,
-    founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl,
+    founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl, facebookUrl,
     muthraIconUrl, acupressureIconUrl, foodIconUrl,
     appointmentSettings, updateAppointmentSettings,
     addCourse, updateCourse, deleteCourse, 
@@ -933,7 +933,7 @@ export function Admin() {
                   <h3 className="font-bold text-slate-900 mb-4 border-b pb-2">Global Logo</h3>
                   <div className="space-y-6">
                     <div className="flex items-center gap-6">
-                      <div className="w-24 h-24 rounded-lg bg-sage-50 border-2 border-dashed border-sage-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <div className="w-36 h-36 rounded-lg bg-sage-50 border-2 border-dashed border-sage-200 flex items-center justify-center overflow-hidden flex-shrink-0 p-2">
                         {logoUrl ? (
                           <img src={logoUrl} alt="Logo preview" className="w-full h-full object-contain" />
                         ) : (
@@ -1296,13 +1296,24 @@ export function Admin() {
                         placeholder="https://instagram.com/..."
                       />
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Facebook Profile URL</label>
+                      <input 
+                        type="url" 
+                        id="facebookUrlInput"
+                        defaultValue={facebookUrl || ""} 
+                        className="w-full px-3 py-2 border rounded-md" 
+                        placeholder="https://facebook.com/..."
+                      />
+                    </div>
                     <div className="flex justify-start">
                       <button 
                         onClick={() => {
                           const wa = (document.getElementById('whatsappNumberInput') as HTMLInputElement).value.trim();
                           const yt = (document.getElementById('youtubeUrlInput') as HTMLInputElement).value.trim();
                           const ig = (document.getElementById('instagramUrlInput') as HTMLInputElement).value.trim();
-                          updateSocialLinks(wa, yt, ig);
+                          const fb = (document.getElementById('facebookUrlInput') as HTMLInputElement).value.trim();
+                          updateSocialLinks(wa, yt, ig, fb);
                           alert('Social links updated successfully!');
                         }}
                         className="bg-sage-600 text-white px-4 py-2 rounded-md hover:bg-sage-700 transition shadow-sm text-sm"

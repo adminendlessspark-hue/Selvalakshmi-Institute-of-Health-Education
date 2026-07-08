@@ -1,9 +1,9 @@
-import { MessageCircle, Youtube, Instagram } from "lucide-react";
+import { MessageCircle, Youtube, Instagram, Facebook } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 
 export function Footer() {
-  const { whatsappNumber, youtubeUrl, instagramUrl, loggedStudentId, isAdmin, webinarVisible } = useStore();
+  const { whatsappNumber, youtubeUrl, instagramUrl, facebookUrl, loggedStudentId, isAdmin, webinarVisible } = useStore();
 
   return (
     <footer className="bg-sage-900 text-sage-200 py-12 mt-auto border-t border-sage-800">
@@ -43,7 +43,7 @@ export function Footer() {
             <li><Link to="/refund" className="hover:text-white transition-colors">Cancellation & Refund Policy</Link></li>
           </ul>
 
-          {(whatsappNumber || youtubeUrl || instagramUrl) && (
+          {(whatsappNumber || youtubeUrl || instagramUrl || facebookUrl) && (
             <div>
               <h3 className="text-white font-bold text-sm mb-3">Connect With Us</h3>
               <div className="flex items-center gap-4">
@@ -78,6 +78,17 @@ export function Footer() {
                     aria-label="Instagram"
                   >
                     <Instagram className="w-5 h-5" />
+                  </a>
+                )}
+                {facebookUrl && (
+                  <a 
+                    href={facebookUrl.startsWith('http') ? facebookUrl : `https://${facebookUrl}`}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 bg-[#1877F2] text-white rounded-full flex items-center justify-center hover:opacity-80 transition-opacity shadow-md"
+                    aria-label="Facebook"
+                  >
+                    <Facebook className="w-5 h-5" />
                   </a>
                 )}
               </div>

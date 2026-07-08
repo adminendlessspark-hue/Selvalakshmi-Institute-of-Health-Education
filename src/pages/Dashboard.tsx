@@ -153,10 +153,10 @@ export function Dashboard() {
                   <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-8">
                       {logoUrl ? (
-                         <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-full border border-sage-200 bg-white" />
+                         <img src={logoUrl} alt="Logo" className="w-16 h-16 object-contain rounded-full border border-sage-200 bg-white p-1" />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-sage-100 flex items-center justify-center">
-                          <Leaf className="w-6 h-6 text-sage-600" />
+                        <div className="w-16 h-16 rounded-full bg-sage-100 flex items-center justify-center">
+                          <Leaf className="w-10 h-10 text-sage-600" />
                         </div>
                       )}
                       <div>
@@ -297,11 +297,11 @@ export function Dashboard() {
                   <div className="absolute inset-4 border-2 border-sage-100 opacity-50 pointer-events-none"></div>
                   <div className="absolute inset-5 border border-sage-200 pointer-events-none"></div>
                   
-                  <div className="w-16 h-16 rounded-full mx-auto mb-6 shadow-sm border border-sage-200 bg-white flex items-center justify-center overflow-hidden">
+                  <div className="w-28 h-28 rounded-full mx-auto mb-6 shadow-sm border border-sage-200 bg-white flex items-center justify-center overflow-hidden">
                     {logoUrl ? (
-                      <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                      <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
                     ) : (
-                      <Leaf className="w-8 h-8 text-sage-600" />
+                      <Leaf className="w-14 h-14 text-sage-600" />
                     )}
                   </div>
                   

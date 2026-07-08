@@ -46,11 +46,11 @@ export function Home() {
           </div>
         )}
         <div className="max-w-7xl mx-auto flex flex-col items-center text-center relative z-10">
-          <div className="w-24 h-24 rounded-full shadow-lg border-2 border-sage-300 mb-6 bg-white flex items-center justify-center overflow-hidden">
+          <div className="w-32 h-32 md:w-40 md:h-40 rounded-full shadow-lg border-2 border-sage-300 mb-6 bg-white flex items-center justify-center overflow-hidden">
             {logoUrl ? (
                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
             ) : (
-               <Leaf className="w-12 h-12 text-sage-600" />
+               <Leaf className="w-16 h-16 md:w-20 md:h-20 text-sage-600" />
             )}
           </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-sage-50 leading-tight mb-6 max-w-4xl drop-shadow-md">

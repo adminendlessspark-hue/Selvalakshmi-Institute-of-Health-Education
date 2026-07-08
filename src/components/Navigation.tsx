@@ -27,14 +27,14 @@ export function Navigation() {
   return (
     <nav className="bg-white border-b border-sage-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 sm:h-20 max-w-full">
+        <div className="flex justify-between h-20 sm:h-24 md:h-28 max-w-full">
           <div className="flex items-center shrink-0">
             <Link to="/" className="flex items-center gap-2 sm:gap-3">
               {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="h-10 sm:h-14 object-contain" />
+                <img src={logoUrl} alt="Logo" className="h-14 sm:h-18 md:h-22 object-contain" />
               ) : (
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-sage-100 flex items-center justify-center">
-                  <Leaf className="w-4 h-4 sm:w-5 sm:h-5 text-sage-600" />
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-sage-100 flex items-center justify-center">
+                  <Leaf className="w-5 h-5 sm:w-7 sm:h-7 text-sage-600" />
                 </div>
               )}
             </Link>

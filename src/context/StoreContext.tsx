@@ -1,7 +1,54 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Course, Student, Video, TestimonialVideo, Appointment, AppointmentSettings } from "../types";
-import { db } from "../lib/firebase";
+import { db, auth } from "../lib/firebase";
 import { collection, doc, onSnapshot, setDoc, deleteDoc, runTransaction } from "firebase/firestore";
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 const INITIAL_COURSES: Course[] = []; // handled by firestore
 const INITIAL_VIDEOS: Video[] = [];
@@ -22,36 +69,37 @@ type StoreContextType = {
   whatsappNumber: string | null;
   youtubeUrl: string | null;
   instagramUrl: string | null;
+  facebookUrl: string | null;
   muthraIconUrl: string | null;
   acupressureIconUrl: string | null;
   foodIconUrl: string | null;
   webinarVisible: boolean;
-  addCourse: (course: Course) => void;
+  addCourse: (course: Course) => Promise<void>;
   addStudent: (student: Omit<Student, "id" | "registrationDate" | "status">) => Promise<string | null>;
   addAppointment: (appointment: Omit<Appointment, "id" | "createdAt">) => Promise<string | null>;
-  updateAppointmentStatus: (id: string, status: "pending" | "confirmed" | "completed", meetLink?: string) => void;
-  deleteAppointment: (id: string) => void;
-  addVideo: (video: Omit<Video, "id">) => void;
-  updateCourse: (course: Course) => void;
-  deleteCourse: (id: string) => void;
-  updateStudent: (student: Student) => void;
-  deleteStudent: (id: string) => void;
-  updateVideo: (video: Video) => void;
-  deleteVideo: (id: string) => void;
-  updateLogo: (url: string) => void;
-  updateFounderVideo: (url: string) => void;
-  updateAboutVideo: (url: string) => void;
-  updateHeroOverlay: (color: string, opacity: number) => void;
-  addHeroImage: (url: string) => void;
-  removeHeroImage: (index: number) => void;
-  updateGpayQr: (url: string) => void;
-  addTestimonialVideo: (title: string, url: string) => void;
-  removeTestimonialVideo: (id: string) => void;
-  updateSocialLinks: (whatsapp: string, youtube: string, instagram: string) => void;
-  updateFeatureIcons: (muthra: string | null, acupressure: string | null, food: string | null) => void;
-  updateWebinarVisible: (v: boolean) => void;
+  updateAppointmentStatus: (id: string, status: "pending" | "confirmed" | "completed", meetLink?: string) => Promise<void>;
+  deleteAppointment: (id: string) => Promise<void>;
+  addVideo: (video: Omit<Video, "id">) => Promise<void>;
+  updateCourse: (course: Course) => Promise<void>;
+  deleteCourse: (id: string) => Promise<void>;
+  updateStudent: (student: Student) => Promise<void>;
+  deleteStudent: (id: string) => Promise<void>;
+  updateVideo: (video: Video) => Promise<void>;
+  deleteVideo: (id: string) => Promise<void>;
+  updateLogo: (url: string) => Promise<void>;
+  updateFounderVideo: (url: string) => Promise<void>;
+  updateAboutVideo: (url: string) => Promise<void>;
+  updateHeroOverlay: (color: string, opacity: number) => Promise<void>;
+  addHeroImage: (url: string) => Promise<void>;
+  removeHeroImage: (index: number) => Promise<void>;
+  updateGpayQr: (url: string) => Promise<void>;
+  addTestimonialVideo: (title: string, url: string) => Promise<void>;
+  removeTestimonialVideo: (id: string) => Promise<void>;
+  updateSocialLinks: (whatsapp: string, youtube: string, instagram: string, facebook: string) => Promise<void>;
+  updateFeatureIcons: (muthra: string | null, acupressure: string | null, food: string | null) => Promise<void>;
+  updateWebinarVisible: (v: boolean) => Promise<void>;
   appointmentSettings: AppointmentSettings | null;
-  updateAppointmentSettings: (settings: AppointmentSettings) => void;
+  updateAppointmentSettings: (settings: AppointmentSettings) => Promise<void>;
   isAdmin: boolean;
   loggedStudentId: string | null;
   loginAdmin: () => void;
@@ -73,6 +121,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [whatsappNumber, setWhatsappNumber] = useState<string | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null);
   const [instagramUrl, setInstagramUrl] = useState<string | null>(null);
+  const [facebookUrl, setFacebookUrl] = useState<string | null>(null);
   const [muthraIconUrl, setMuthraIconUrl] = useState<string | null>(null);
   const [acupressureIconUrl, setAcupressureIconUrl] = useState<string | null>(null);
   const [foodIconUrl, setFoodIconUrl] = useState<string | null>(null);
@@ -132,6 +181,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setWhatsappNumber(data.whatsappNumber || null);
         setYoutubeUrl(data.youtubeUrl || null);
         setInstagramUrl(data.instagramUrl || null);
+        setFacebookUrl(data.facebookUrl || null);
         
         setMuthraIconUrl(data.muthraIconUrl || null);
         setAcupressureIconUrl(data.acupressureIconUrl || null);
@@ -167,19 +217,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const addCourse = async (course: Course) => {
     try {
       await setDoc(doc(collection(db, "courses"), course.id), course);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `courses/${course.id}`);
+    }
   };
 
   const updateCourse = async (updatedCourse: Course) => {
     try {
       await setDoc(doc(db, "courses", updatedCourse.id), updatedCourse);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `courses/${updatedCourse.id}`);
+    }
   };
 
   const deleteCourse = async (id: string) => {
     try {
       await deleteDoc(doc(db, "courses", id));
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `courses/${id}`);
+    }
   };
 
   const addStudent = async (studentData: Omit<Student, "id" | "registrationDate" | "status">) => {
@@ -193,7 +249,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await setDoc(doc(collection(db, "students"), newStudent.id), newStudent);
       return newStudent.id;
     } catch (err) { 
-      console.error(err); 
+      handleFirestoreError(err, OperationType.WRITE, `students/${newStudent.id}`);
       return null;
     }
   };
@@ -201,13 +257,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const updateStudent = async (updatedStudent: Student) => {
     try {
       await setDoc(doc(db, "students", updatedStudent.id), updatedStudent);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `students/${updatedStudent.id}`);
+    }
   };
 
   const deleteStudent = async (id: string) => {
     try {
       await deleteDoc(doc(db, "students", id));
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `students/${id}`);
+    }
   };
 
   const addAppointment = async (appointmentData: Omit<Appointment, "id" | "createdAt">) => {
@@ -220,8 +280,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await setDoc(doc(db, "appointments", newAppointment.id), newAppointment);
       return newAppointment.id;
     } catch (err) { 
-      console.error("Failed to book appointment", err); 
-      return (err as Error).message;
+      handleFirestoreError(err, OperationType.WRITE, `appointments/${newAppointment.id}`);
+      return null;
     }
   };
 
@@ -230,13 +290,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const updateData: any = { status };
       if (meetLink) updateData.meetLink = meetLink;
       await setDoc(doc(db, "appointments", id), updateData, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `appointments/${id}`);
+    }
   };
 
   const deleteAppointment = async (id: string) => {
     try {
       await deleteDoc(doc(db, "appointments", id));
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `appointments/${id}`);
+    }
   };
 
   const addVideo = async (videoData: Omit<Video, "id">) => {
@@ -246,85 +310,112 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
     try {
       await setDoc(doc(collection(db, "videos"), newVideo.id), newVideo);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `videos/${newVideo.id}`);
+    }
   };
 
   const updateVideo = async (updatedVideo: Video) => {
     try {
       await setDoc(doc(db, "videos", updatedVideo.id), updatedVideo);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `videos/${updatedVideo.id}`);
+    }
   };
 
   const deleteVideo = async (id: string) => {
     try {
       await deleteDoc(doc(db, "videos", id));
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `videos/${id}`);
+    }
   };
 
   const updateLogo = async (url: string) => {
     try {
       await setDoc(doc(db, "settings", "global"), { logoUrl: url }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   const updateFounderVideo = async (url: string) => {
     try {
       await setDoc(doc(db, "settings", "global"), { founderVideoUrl: url || null }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   const updateAboutVideo = async (url: string) => {
     try {
       await setDoc(doc(db, "settings", "global"), { aboutVideoUrl: url || null }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   const updateHeroOverlay = async (color: string, opacity: number) => {
     try {
       await setDoc(doc(db, "settings", "global"), { heroOverlayColor: color, heroOverlayOpacity: opacity }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   const addHeroImage = async (url: string) => {
     try {
       await setDoc(doc(db, "settings", "global"), { heroImages: [...heroImages, url] }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   const removeHeroImage = async (index: number) => {
     const newImages = heroImages.filter((_, i) => i !== index);
     try {
       await setDoc(doc(db, "settings", "global"), { heroImages: newImages }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   const updateGpayQr = async (url: string) => {
     try {
       await setDoc(doc(db, "settings", "global"), { gpayQrUrl: url || null }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   const addTestimonialVideo = async (title: string, url: string) => {
     const newVid = { id: `vid-${Date.now()}`, title, url };
     try {
       await setDoc(doc(collection(db, "testimonialVideos"), newVid.id), newVid);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `testimonialVideos/${newVid.id}`);
+    }
   };
 
   const removeTestimonialVideo = async (id: string) => {
     try {
       await deleteDoc(doc(db, "testimonialVideos", id));
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `testimonialVideos/${id}`);
+    }
   };
 
-  const updateSocialLinks = async (whatsapp: string, youtube: string, instagram: string) => {
+  const updateSocialLinks = async (whatsapp: string, youtube: string, instagram: string, facebook: string) => {
     try {
       await setDoc(doc(db, "settings", "global"), { 
         whatsappNumber: whatsapp || null,
         youtubeUrl: youtube || null,
-        instagramUrl: instagram || null
+        instagramUrl: instagram || null,
+        facebookUrl: facebook || null
       }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   const updateFeatureIcons = async (muthra: string | null, acupressure: string | null, food: string | null) => {
@@ -334,25 +425,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         acupressureIconUrl: acupressure || null,
         foodIconUrl: food || null
       }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   const updateWebinarVisible = async (v: boolean) => {
     try {
       await setDoc(doc(db, "settings", "global"), { webinarVisible: v }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   const updateAppointmentSettings = async (settings: AppointmentSettings) => {
     try {
       await setDoc(doc(db, "settings", "global"), { appointmentSettings: settings }, { merge: true });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+    }
   };
 
   return (
     <StoreContext.Provider value={{ 
       courses, students, appointments, videos, logoUrl, heroImages, heroOverlayColor, heroOverlayOpacity, gpayQrUrl, testimonialVideos,
-      founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl,
+      founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl, facebookUrl,
       muthraIconUrl, acupressureIconUrl, foodIconUrl, webinarVisible,
       appointmentSettings, updateAppointmentSettings,
       addCourse, updateCourse, deleteCourse, 
