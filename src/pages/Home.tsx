@@ -5,7 +5,7 @@ import { ArrowRight, Leaf, Heart, BookOpen, Youtube, Instagram, MessageCircle, H
 import { cn } from "../lib/utils";
 
 export function Home() {
-  const { courses, logoUrl, heroImages, testimonialVideos, founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl, muthraIconUrl, acupressureIconUrl, foodIconUrl, webinarVisible, isAdmin } = useStore();
+  const { courses, logoUrl, heroImages, heroOverlayColor, heroOverlayOpacity, testimonialVideos, founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl, muthraIconUrl, acupressureIconUrl, foodIconUrl, webinarVisible, isAdmin } = useStore();
   const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
@@ -19,9 +19,9 @@ export function Home() {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-sage-900 text-white py-20 px-4 sm:px-6 lg:px-8 min-h-[600px] flex items-center justify-center">
-        {heroImages && heroImages.length > 0 && (
-          <div className="absolute inset-0 z-0">
+      <section className="relative overflow-hidden text-white py-20 px-4 sm:px-6 lg:px-8 min-h-[600px] flex items-center justify-center" style={{ backgroundColor: heroOverlayColor || '#1A2F23' }}>
+        {heroImages && heroImages.length > 0 ? (
+          <div className="absolute inset-0 z-0 bg-black">
             {heroImages.map((img, index) => (
               <img
                 key={index}
@@ -33,7 +33,16 @@ export function Home() {
                 )}
               />
             ))}
-            <div className="absolute inset-0 bg-sage-900/70" />
+            <div className="absolute inset-0" style={{ backgroundColor: heroOverlayColor || '#1A2F23', opacity: (heroOverlayOpacity ?? 70) / 100 }} />
+          </div>
+        ) : (
+          <div className="absolute inset-0 z-0 bg-black">
+             <img 
+               src="https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&q=80&w=1600" 
+               alt="Hero Background" 
+               className="absolute inset-0 w-full h-full object-cover opacity-100" 
+             />
+             <div className="absolute inset-0" style={{ backgroundColor: heroOverlayColor || '#1A2F23', opacity: (heroOverlayOpacity ?? 70) / 100 }} />
           </div>
         )}
         <div className="max-w-7xl mx-auto flex flex-col items-center text-center relative z-10">
@@ -56,6 +65,12 @@ export function Home() {
               className="bg-sage-300 text-sage-900 font-medium px-6 py-3 rounded-md hover:bg-sage-200 transition-colors shadow-sm inline-flex items-center justify-center gap-2"
             >
               Course Enroll <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              to="/appointment"
+              className="bg-white/10 backdrop-blur-sm text-white border border-white/20 font-medium px-6 py-3 rounded-md hover:bg-white/20 transition-colors shadow-sm inline-flex items-center justify-center gap-2"
+            >
+              Book Consultation
             </Link>
             {(webinarVisible || isAdmin) && (
               <Link

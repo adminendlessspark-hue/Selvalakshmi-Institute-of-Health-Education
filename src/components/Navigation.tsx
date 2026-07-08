@@ -9,15 +9,18 @@ export function Navigation() {
   const { logoUrl, isAdmin, loggedStudentId, logoutAdmin, logoutStudent, webinarVisible } = useStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const baseNavLinks = [
+  type NavLink = { to: string; label: string; special?: boolean };
+
+  const baseNavLinks: NavLink[] = [
     { to: "/", label: "Home" },
     { to: "/courses", label: "Courses" },
   ];
-  const endNavLinks = [
+  const endNavLinks: NavLink[] = [
+    { to: "/appointment", label: "Consultation" },
     { to: "/register", label: "Register" },
   ];
 
-  const navLinks = webinarVisible || isAdmin
+  const navLinks: NavLink[] = webinarVisible || isAdmin
     ? [...baseNavLinks, { to: "/webinar", label: "Webinar", special: true }, ...endNavLinks]
     : [...baseNavLinks, ...endNavLinks];
 

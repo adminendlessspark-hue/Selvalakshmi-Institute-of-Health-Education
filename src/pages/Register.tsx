@@ -3,6 +3,16 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { QRCodeSVG } from "qrcode.react";
 
+const loadRazorpay = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 const translations = {
   en: {
     pageTitle: "Student Registration",
@@ -85,11 +95,81 @@ export function Register() {
     }
   }, [searchParams, courses]);
 
+  const [loadingPayment, setLoadingPayment] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = await addStudent({...formData, phone: `${countryCode}${formData.phone}`});
     setCreatedStudentId(id);
-    setIsSubmitted(true);
+
+    // Check if course requires payment
+    const selectedCourse = courses.find(c => c.id === formData.courseId);
+    const feeString = selectedCourse?.fee || "";
+    const isFree = feeString.toLowerCase() === 'free' || feeString === '0' || feeString === '';
+    
+    if (!isFree) {
+        try {
+          setLoadingPayment(true);
+          const feeAmountMatch = feeString.match(/\d+(\.\d+)?/);
+          // Amount in rupees for Razorpay
+          const amountInRupees = feeAmountMatch ? parseFloat(feeAmountMatch[0]) : 50;
+          
+          const isLoaded = await loadRazorpay();
+          if (!isLoaded) throw new Error("Razorpay SDK not loaded");
+
+          const response = await fetch("/api/create-razorpay-order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+              amount: amountInRupees, 
+              title: `Registration for ${selectedCourse?.title || "Course"}` 
+            }),
+          });
+          
+          const orderData = await response.json();
+          if (!response.ok) throw new Error(orderData.error || "Failed to create session");
+          
+          const keyResponse = await fetch("/api/razorpay-key");
+          const keyData = await keyResponse.json();
+          if (!keyData.key) throw new Error("Razorpay Key ID not configured");
+          
+          const options = {
+            key: keyData.key,
+            amount: orderData.amount,
+            currency: orderData.currency,
+            name: "Selvalakshmi Foundation",
+            description: `Registration for ${selectedCourse?.title || "Course"}`,
+            order_id: orderData.id,
+            handler: function (response: any) {
+               setIsSubmitted(true);
+            },
+            prefill: {
+              name: `${formData.firstName} ${formData.lastName}`,
+              email: formData.email,
+              contact: `${countryCode}${formData.phone}`
+            },
+            theme: {
+              color: "#0d9488"
+            }
+          };
+
+          const rzp = new (window as any).Razorpay(options);
+          rzp.on('payment.failed', function (response: any){
+            alert(`Payment initialization failed: ${response.error.description}. Your registration was saved, but payment is pending.`);
+            setIsSubmitted(true);
+          });
+          rzp.open();
+
+        } catch (error: any) {
+          console.error("Payment error:", error);
+          alert(`Payment initialization failed: ${error.message}. Your registration was saved, but payment is pending.`);
+          setIsSubmitted(true);
+        } finally {
+          setLoadingPayment(false);
+        }
+    } else {
+        setIsSubmitted(true);
+    }
   };
 
   if (isSubmitted) {
@@ -189,6 +269,37 @@ export function Register() {
           <h1 className="text-3xl font-serif font-bold text-sage-900 mb-4">{t.pageTitle}</h1>
           <p className="text-slate-600">{t.pageSubtitle}</p>
         </div>
+
+        {(() => {
+          const selectedCourseObj = courses.find((c) => c.id === formData.courseId);
+          if (!selectedCourseObj) return null;
+          return (
+            <div className="bg-white rounded-xl shadow-sm border border-sage-100 overflow-hidden mb-10">
+              {selectedCourseObj.videoUrl ? (
+                 <div className="w-full aspect-video">
+                   <iframe 
+                     src={selectedCourseObj.videoUrl}
+                     className="w-full h-full"
+                     allowFullScreen
+                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                   />
+                 </div>
+              ) : selectedCourseObj.imageUrl && (
+                 <img src={selectedCourseObj.imageUrl} alt={selectedCourseObj.title} className="w-full h-64 object-cover" />
+              )}
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">{selectedCourseObj.title}</h2>
+                <div className="flex flex-wrap gap-4 text-sm text-sage-700 mb-4 font-medium">
+                   <span>⏱️ {selectedCourseObj.duration}</span>
+                   {selectedCourseObj.fee && (
+                      <span>💰 {selectedCourseObj.fee.toLowerCase() === 'free' || selectedCourseObj.fee.includes('₹') ? selectedCourseObj.fee : `₹${selectedCourseObj.fee}`}</span>
+                   )}
+                </div>
+                <p className="text-slate-600 whitespace-pre-wrap">{selectedCourseObj.description}</p>
+              </div>
+            </div>
+          );
+        })()}
 
         <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl shadow-sm border border-sage-100">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -331,22 +442,21 @@ export function Register() {
                 <div className="bg-white px-4 py-2 rounded-lg border border-sage-100 mb-4 font-medium text-sage-800 shadow-sm">
                   {t.feeLabel}: {feeString.includes('₹') ? feeString : `₹${feeString}`}
                 </div>
-                <p className="text-sm text-slate-600 mb-6 text-center">{t.paymentInstructions}</p>
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                   <QRCodeSVG value={upiUrl} size={180} level="H" includeMargin={true} />
+                <p className="text-sm text-slate-600 mb-2 text-center">Standard Card Payment / Net Banking via Secure Gateway.</p>
+                <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                  <span>Processed securely</span>
                 </div>
-                <p className="text-sm text-sage-900 font-medium mt-3 text-center">Scan via any UPI App</p>
-                <p className="text-xs text-slate-500 font-mono mt-1">UPI ID: {upiId}</p>
-                <p className="text-xs text-sage-600 mt-4 font-medium tracking-wide">{t.securePayment}</p>
               </div>
             );
           })()}
 
           <button
             type="submit"
-            className="w-full bg-sage-600 text-white font-medium py-3 rounded-md hover:bg-sage-700 transition shadow-sm"
+            disabled={loadingPayment}
+            className="w-full bg-sage-600 text-white font-medium py-3 rounded-md hover:bg-sage-700 transition shadow-sm disabled:bg-sage-400 flex justify-center items-center gap-2"
           >
-            {t.submitButton}
+            {loadingPayment ? "Redirecting to Payment Gateway..." : t.submitButton}
           </button>
           <p className="text-xs text-center text-slate-500 mt-4">
             {t.terms}

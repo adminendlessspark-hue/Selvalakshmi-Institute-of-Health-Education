@@ -37,5 +37,9 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+    
+    match /appointments/{appointmentId} {
+      allow read, write: if true; // allow anyone to book an appointment
+    }
   }
 }

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useStore } from "../context/StoreContext";
+import { getOAuthToken } from "../lib/oauth";
 import { Users, BookOpen, Video as VideoIcon, Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Upload, Share2, Copy, ListChecks } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Course, Student, Video, Quiz } from "../types";
@@ -19,16 +20,19 @@ const formatDateString = (dateStr: string) => {
 
 export function Admin() {
   const { 
-    courses, students, videos, logoUrl, heroImages, gpayQrUrl, testimonialVideos,
+    courses, students, appointments, videos, logoUrl, heroImages, heroOverlayColor, heroOverlayOpacity, gpayQrUrl, testimonialVideos,
     founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl,
     muthraIconUrl, acupressureIconUrl, foodIconUrl,
+    appointmentSettings, updateAppointmentSettings,
     addCourse, updateCourse, deleteCourse, 
     addStudent, updateStudent, deleteStudent, 
+    updateAppointmentStatus, deleteAppointment,
     addVideo, updateVideo, deleteVideo, updateLogo,
     updateFounderVideo, updateAboutVideo, updateSocialLinks,
-    addHeroImage, removeHeroImage, updateGpayQr, addTestimonialVideo, removeTestimonialVideo, updateFeatureIcons
+    addHeroImage, removeHeroImage, updateHeroOverlay, updateGpayQr, addTestimonialVideo, removeTestimonialVideo, updateFeatureIcons,
+    webinarVisible, updateWebinarVisible
   } = useStore();
-  const [activeTab, setActiveTab] = useState<"registrations" | "courses" | "videos" | "appearance" | "marketing">("registrations");
+  const [activeTab, setActiveTab] = useState<"registrations" | "appointments" | "courses" | "videos" | "appearance" | "marketing">("registrations");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const heroInputRef = useRef<HTMLInputElement>(null);
@@ -36,6 +40,41 @@ export function Admin() {
   const muthraInputRef = useRef<HTMLInputElement>(null);
   const acupressureInputRef = useRef<HTMLInputElement>(null);
   const foodInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGenerateMeetLink = async (apt: any) => {
+    try {
+      const token = await getOAuthToken(['https://www.googleapis.com/auth/meetings.space.created']);
+      const response = await fetch("https://meet.googleapis.com/v2/spaces", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({})
+      });
+      if (!response.ok) {
+        throw new Error("Failed to create Google Meet space");
+      }
+      const data = await response.json();
+      const meetLink = data.meetingUri;
+      
+      await updateAppointmentStatus(apt.id, apt.status, meetLink);
+      alert("Meet link generated successfully!");
+    } catch (err) {
+      alert("Failed to generate Google Meet link: " + (err as Error).message);
+    }
+  };
+
+  const handleShareMeetLink = (apt: any) => {
+    const meetLink = apt.meetLink || appointmentSettings?.defaultMeetLink || "No link provided";
+    const message = `Hello ${apt.name},\n\nYour consultation appointment is confirmed for ${apt.date} at ${apt.time}.\n\nPlease join using this Google Meet link: ${meetLink}\n\nFrom: jcmpselvalakshmifoundation@gmail.com`;
+    window.open(`https://wa.me/${apt.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+    
+    if (apt.email) {
+      const subject = `Consultation Appointment Confirmation - ${apt.date} ${apt.time}`;
+      window.open(`mailto:${apt.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`);
+    }
+  };
 
   // Local state for forms
   const [showCourseForm, setShowCourseForm] = useState(false);
@@ -58,7 +97,7 @@ export function Admin() {
 
   const [templateLanguage, setTemplateLanguage] = useState<"en" | "ta">("en");
   const [selectedCourseForTemplate, setSelectedCourseForTemplate] = useState<string>("");
-  const [shareTemplateText, setShareTemplateText] = useState<string>(`🌟 *Welcome to Our Platform!* 🌟\n\nExplore our latest courses and sign up today!\n\n🔗 *Visit:*\n${window.location.origin}`);
+  const [shareTemplateText, setShareTemplateText] = useState<string>(`🌟 *Welcome to Our Platform!* 🌟\n\nExplore our latest courses and sign up today!\n\n🔗 *Visit:*\nhttps://selvalakshmihealtheducation.in`);
 
   const handleAddCourse = (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,38 +169,21 @@ export function Admin() {
       const testimonyLineTa = testimonyUrl ? `\n\n🗣️ *பயிற்சியாளர் கருத்து:*\n${testimonyUrl}` : "";
 
       const getPublicBaseUrl = () => {
-        let url = window.location.origin;
-        // Automatically convert AI Studio dev URLs to public assigned URLs
-        if (url.includes('ais-dev-')) {
-            url = url.replace('ais-dev-', 'ais-pre-');
-        }
-        return url + window.location.pathname;
+        return "https://selvalakshmihealtheducation.in";
       };
 
       const publicBaseUrl = getPublicBaseUrl();
       const cleanBaseUrl = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
-      const registerUrl = `${cleanBaseUrl}/#/register`;
-
-      const formattedFee = course.fee ? ((course.fee.toLowerCase() === 'free' || course.fee.includes('₹')) ? course.fee : `₹${course.fee}`) : "";
-      const feeLineEn = formattedFee ? `\n💰 *Fee:* ${formattedFee}` : "";
-      const feeLineTa = formattedFee ? `\n💰 *கட்டணம்:* ${formattedFee}` : "";
-
-      const formattedLaunchDate = course.launchDate ? formatDateString(course.launchDate) : "";
-      const launchDateLineEn = formattedLaunchDate ? `\n🚀 *Launch Date:* ${formattedLaunchDate}` : "";
-      const launchDateLineTa = formattedLaunchDate ? `\n🚀 *தொடங்கும் தேதி:* ${formattedLaunchDate}` : "";
+      const registerUrl = `${cleanBaseUrl}/#/register?course=${course.id}`;
 
       if (templateLanguage === "en") {
-        setShareTemplateText(`🌟 *Join Our New Program!* 🌟\n\n📚 *Course:* ${course.title}\n⏱️ *Duration:* ${course.duration}${feeLineEn}${launchDateLineEn}\n\n📝 *Description:*\n${course.description}${videoLineEn}${testimonyLineEn}\n\n🔗 *Register Now at:*\n${registerUrl}\n\nDon't miss out on this opportunity!`);
+        setShareTemplateText(`🌟 *Join Our New Program: ${course.title}* 🌟\n\nClick the link below to view course details and register:\n\n🔗 *Register Now at:*\n${registerUrl}\n\nDon't miss out on this opportunity!`);
       } else {
-         setShareTemplateText(`🌟 *எங்கள் புதிய வகுப்பில் இணையுங்கள்!* 🌟\n\n📚 *வகுப்பு:* ${course.title}\n⏱️ *கால அளவு:* ${course.duration}${feeLineTa}${launchDateLineTa}\n\n📝 *விளக்கம்:*\n${course.description}${videoLineTa}${testimonyLineTa}\n\n🔗 *இப்போதே பதிவு செய்யுங்கள்:*\n${registerUrl}\n\nஇந்த வாய்ப்பை தவறவிடாதீர்கள்!`);
+         setShareTemplateText(`🌟 *எங்கள் புதிய வகுப்பில் இணையுங்கள்: ${course.title}* 🌟\n\nவகுப்பு விவரங்களை அறியவும் பதிவு செய்யவும் கீழே உள்ள லிங்கை அழுத்தவும்:\n\n🔗 *இப்போதே பதிவு செய்யுங்கள்:*\n${registerUrl}\n\nஇந்த வாய்ப்பை தவறவிடாதீர்கள்!`);
       }
     } else {
       const getPublicBaseUrl = () => {
-        let url = window.location.origin;
-        if (url.includes('ais-dev-')) {
-            url = url.replace('ais-dev-', 'ais-pre-');
-        }
-        return url + window.location.pathname;
+        return "https://selvalakshmihealtheducation.in";
       };
       
       const publicBaseUrl = getPublicBaseUrl();
@@ -271,6 +293,15 @@ export function Admin() {
                   )}
                 >
                   <Users className="w-5 h-5" /> Registrations
+                </button>
+                <button
+                  onClick={() => setActiveTab("appointments")}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm font-medium transition",
+                    activeTab === "appointments" ? "bg-sage-50 text-sage-700" : "text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  <Users className="w-5 h-5" /> Appointments
                 </button>
                 <button
                   onClick={() => setActiveTab("courses")}
@@ -417,6 +448,163 @@ export function Admin() {
                             </tr>
                           )
                         })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "appointments" && (
+              <div className="space-y-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-sage-200">
+                  <h3 className="font-bold text-slate-900 mb-4">Appointment Settings</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Consultation Fee (₹)</label>
+                      <input 
+                        type="number" 
+                        className="w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-sage-500 outline-none" 
+                        value={appointmentSettings?.fee ?? 100} 
+                        onChange={e => updateAppointmentSettings({ ...(appointmentSettings || { slots: [] }), fee: parseInt(e.target.value) || 0 })} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Default Google Meet Link (Reusable)</label>
+                      <input 
+                        type="url" 
+                        placeholder="https://meet.google.com/..."
+                        className="w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-sage-500 outline-none" 
+                        value={appointmentSettings?.defaultMeetLink || ""} 
+                        onChange={e => updateAppointmentSettings({ ...(appointmentSettings || { slots: [], fee: 100 }), defaultMeetLink: e.target.value })} 
+                      />
+                      <p className="text-xs text-slate-500 mt-1">If set, this link is automatically sent to patients upon booking.</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Add Available Slot</label>
+                      <div className="flex gap-2">
+                        <input type="date" id="newSlotDate" className="px-3 py-2 border rounded-md outline-none" />
+                        <input type="time" id="newSlotTime" className="px-3 py-2 border rounded-md outline-none" />
+                        <button 
+                          onClick={() => {
+                            const d = (document.getElementById("newSlotDate") as HTMLInputElement).value;
+                            const t = (document.getElementById("newSlotTime") as HTMLInputElement).value;
+                            if (d && t) {
+                              updateAppointmentSettings({
+                                ...(appointmentSettings || { fee: 100 }),
+                                slots: [...(appointmentSettings?.slots || []), { date: d, time: t }]
+                              });
+                            }
+                          }}
+                          className="bg-sage-600 text-white px-4 py-2 rounded-md hover:bg-sage-700 transition whitespace-nowrap"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {appointmentSettings?.slots && appointmentSettings.slots.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-slate-700 mb-2">Configured Slots</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {appointmentSettings.slots.map((slot, idx) => (
+                          <div key={idx} className="bg-sage-50 text-sage-800 px-3 py-1.5 rounded-full text-sm border border-sage-200 flex items-center gap-2">
+                            <span>{slot.date} {slot.time}</span>
+                            <button 
+                              onClick={() => {
+                                const newSlots = appointmentSettings.slots.filter((_, i) => i !== idx);
+                                updateAppointmentSettings({ ...appointmentSettings, slots: newSlots });
+                              }}
+                              className="text-sage-500 hover:text-red-500"
+                            >×</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <h2 className="text-2xl font-serif font-bold text-sage-900 mt-8">Consultation Appointments</h2>
+                {appointments && appointments.length === 0 ? (
+                  <p className="text-slate-600 bg-white p-6 rounded-xl border border-sage-100">No appointments requested yet.</p>
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm border border-sage-100 overflow-hidden">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-sage-50 text-sage-800 border-b border-sage-200">
+                        <tr>
+                          <th className="p-4 font-semibold">ID</th>
+                          <th className="p-4 font-semibold">Name</th>
+                          <th className="p-4 font-semibold">Contact</th>
+                          <th className="p-4 font-semibold">Date & Time</th>
+                          <th className="p-4 font-semibold">Problem</th>
+                          <th className="p-4 font-semibold">Status</th>
+                          <th className="p-4 font-semibold text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-sage-100">
+                        {(appointments || []).map((apt) => (
+                          <tr key={apt.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-4 font-medium text-slate-900">{apt.id}</td>
+                            <td className="p-4">{apt.name}</td>
+                            <td className="p-4">
+                              <div>{apt.phone}</div>
+                              <div className="text-slate-500">{apt.email || '-'}</div>
+                            </td>
+                            <td className="p-4 whitespace-nowrap">
+                              <div>{apt.date}</div>
+                              <div className="text-slate-500">{apt.time}</div>
+                            </td>
+                            <td className="p-4 max-w-xs truncate" title={apt.problem}>{apt.problem}</td>
+                            <td className="p-4">
+                              <span className={cn(
+                                "px-2 py-1 text-xs font-medium rounded-full",
+                                apt.status === "confirmed" && "bg-blue-100 text-blue-700",
+                                apt.status === "completed" && "bg-green-100 text-green-700",
+                                apt.status === "pending" && "bg-yellow-100 text-yellow-700",
+                              )}>
+                                {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
+                              </span>
+                            </td>
+                            <td className="p-4 flex gap-1 justify-end opacity-50 hover:opacity-100">
+                              <button 
+                                title="Generate Meet Link" 
+                                onClick={() => handleGenerateMeetLink(apt)} 
+                                className="p-1 text-purple-600 hover:bg-purple-50 rounded flex items-center gap-1 px-2"
+                              >
+                                <VideoIcon className="w-4 h-4" />
+                                <span className="text-xs font-medium">Generate</span>
+                              </button>
+                              <button 
+                                title="Share Meet Link" 
+                                onClick={() => handleShareMeetLink(apt)} 
+                                className="p-1 text-purple-600 hover:bg-purple-50 rounded flex items-center gap-1 px-2"
+                              >
+                                <VideoIcon className="w-4 h-4" />
+                                <span className="text-xs font-medium">Share Meet</span>
+                              </button>
+                              {apt.meetLink && (
+                                <a 
+                                  href={apt.meetLink} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  title="Join Google Meet"
+                                  className="p-1 text-green-600 hover:bg-green-50 rounded flex items-center gap-1 px-2"
+                                >
+                                  <VideoIcon className="w-4 h-4" />
+                                  <span className="text-xs font-medium">Join</span>
+                                </a>
+                              )}
+                              {apt.status === "pending" && (
+                                <button title="Confirm" onClick={() => updateAppointmentStatus(apt.id, "confirmed")} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Check className="w-4 h-4"/></button>
+                              )}
+                              {apt.status === "confirmed" && (
+                                <button title="Complete" onClick={() => updateAppointmentStatus(apt.id, "completed")} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check className="w-4 h-4"/></button>
+                              )}
+                              <button onClick={() => { if(window.confirm('Delete this appointment?')) deleteAppointment(apt.id); }} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -703,11 +891,11 @@ export function Admin() {
                         <input 
                           type="checkbox" 
                           className="sr-only" 
-                          checked={useStore().webinarVisible || false} 
-                          onChange={(e) => useStore().updateWebinarVisible(e.target.checked)} 
+                          checked={webinarVisible || false} 
+                          onChange={(e) => updateWebinarVisible(e.target.checked)} 
                         />
-                        <div className={cn("block w-14 h-8 rounded-full transition-colors", useStore().webinarVisible ? "bg-sage-600" : "bg-slate-300")}></div>
-                        <div className={cn("absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform", useStore().webinarVisible ? "transform translate-x-6" : "")}></div>
+                        <div className={cn("block w-14 h-8 rounded-full transition-colors", webinarVisible ? "bg-sage-600" : "bg-slate-300")}></div>
+                        <div className={cn("absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform", webinarVisible ? "transform translate-x-6" : "")}></div>
                       </div>
                       <div>
                         <div className="font-medium text-slate-900">Show Webinar Page</div>
@@ -758,53 +946,26 @@ export function Admin() {
                   </div>
                 </div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-sage-100 max-w-2xl mt-6">
-                  <div className="flex justify-between items-center mb-4 border-b pb-2">
+                  <div className="mb-4 border-b pb-2">
                     <h3 className="font-bold text-slate-900">Landing Page Slider Images</h3>
-                    <button 
-                      onClick={() => heroInputRef.current?.click()}
-                      className="flex items-center gap-2 bg-sage-600 text-white px-3 py-1.5 rounded-md hover:bg-sage-700 transition shadow-sm text-sm"
-                    >
-                      <Plus className="w-4 h-4" /> Upload Image
-                    </button>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      ref={heroInputRef}
-                      onChange={handleHeroImageChange}
-                    />
                   </div>
-                  <p className="text-sm text-slate-600 mb-4">Upload images to display in the background slider on the home page, or add via an external URL (e.g. Google Drive Direct Link).</p>
+                  <p className="text-sm text-slate-600 mb-4">Upload images to display in the background slider on the home page.</p>
 
-                  <div className="flex gap-2 mb-6">
-                    <input 
-                      type="text" 
-                      placeholder="Paste Image URL here (must be an image file link or direct link)..." 
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-1 focus:ring-sage-500 outline-none"
-                      id="heroUrlInput"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          const val = (e.target as HTMLInputElement).value.trim();
-                          if (val) {
-                            addHeroImage(val);
-                            (e.target as HTMLInputElement).value = '';
-                          }
-                        }
-                      }}
-                    />
-                    <button 
-                      onClick={() => {
-                        const input = document.getElementById('heroUrlInput') as HTMLInputElement;
-                        if(input && input.value.trim()) {
-                          addHeroImage(input.value.trim());
-                          input.value = '';
-                        }
-                      }}
-                      className="bg-slate-800 text-white px-4 py-2 rounded-md hover:bg-slate-700 transition shadow-sm text-sm whitespace-nowrap"
-                    >
-                      Add URL
-                    </button>
+                  <div 
+                    onClick={() => heroInputRef.current?.click()}
+                    className="flex flex-col items-center justify-center p-8 mb-6 border-2 border-dashed border-sage-200 rounded-xl bg-sage-50 hover:bg-sage-100 cursor-pointer transition"
+                  >
+                    <Plus className="w-8 h-8 text-sage-500 mb-2" />
+                    <span className="font-medium text-sage-700">Click to Upload Image</span>
+                    <span className="text-xs text-sage-500 mt-1">JPEG, PNG up to 5MB</span>
                   </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    ref={heroInputRef}
+                    onChange={handleHeroImageChange}
+                  />
 
                   {heroImages.length === 0 ? (
                     <div className="text-center py-8 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-slate-500 text-sm">
@@ -828,46 +989,59 @@ export function Admin() {
                       ))}
                     </div>
                   )}
-                </div>
-                
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-sage-100 max-w-2xl mt-6">
-                  <h3 className="font-bold text-slate-900 mb-4 border-b pb-2">GPay QR Code Setup</h3>
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-6">
-                      <div className="w-24 h-24 rounded-lg bg-sage-50 border-2 border-dashed border-sage-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {gpayQrUrl ? (
-                          <img src={gpayQrUrl} alt="GPay QR preview" className="w-full h-full object-contain" />
-                        ) : (
-                          <span className="text-xs text-sage-400 text-center px-2">No QR set</span>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-sm text-slate-600">Upload your Google Pay QR code. This will be shown to users during the registration process to collect payments.</p>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          ref={gpayInputRef}
-                          onChange={handleGpayQrChange}
-                        />
+
+                  <div className="mt-8 pt-6 border-t border-slate-100">
+                    <h4 className="font-medium text-slate-900 mb-4">Background Overlay Adjustment</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Overlay Color</label>
                         <div className="flex gap-3">
-                          <button 
-                            onClick={() => gpayInputRef.current?.click()}
-                            className="flex items-center gap-2 bg-sage-600 text-white px-4 py-2 rounded-md hover:bg-sage-700 transition shadow-sm text-sm"
-                          >
-                            <Upload className="w-4 h-4" /> Upload QR Code
-                          </button>
-                          {gpayQrUrl && (
-                            <button 
-                              onClick={() => updateGpayQr('')}
-                              className="px-4 py-2 text-red-600 hover:bg-red-50 border border-slate-200 rounded-md text-sm transition"
-                            >
-                              Remove
-                            </button>
-                          )}
+                          <input 
+                            type="color" 
+                            className="w-12 h-10 p-1 border border-slate-200 rounded cursor-pointer"
+                            id="overlayColor"
+                            defaultValue={heroOverlayColor || "#1A2F23"}
+                          />
+                          <input 
+                            type="text" 
+                            className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm"
+                            id="overlayColorText"
+                            defaultValue={heroOverlayColor || "#1A2F23"}
+                            onChange={(e) => {
+                               const picker = document.getElementById("overlayColor") as HTMLInputElement;
+                               if(picker) picker.value = e.target.value;
+                            }}
+                          />
                         </div>
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Opacity: <span id="opacityLabel">{heroOverlayOpacity ?? 70}</span>%
+                        </label>
+                        <input 
+                          type="range" 
+                          min="0" max="100" 
+                          className="w-full mt-2"
+                          id="overlayOpacity"
+                          defaultValue={heroOverlayOpacity ?? 70}
+                          onChange={(e) => {
+                            const lbl = document.getElementById("opacityLabel");
+                            if(lbl) lbl.innerText = e.target.value;
+                          }}
+                        />
+                      </div>
                     </div>
+                    <button
+                      onClick={() => {
+                        const col = (document.getElementById("overlayColorText") as HTMLInputElement).value || "#1A2F23";
+                        const op = parseInt((document.getElementById("overlayOpacity") as HTMLInputElement).value || "70", 10);
+                        updateHeroOverlay(col, isNaN(op) ? 70 : op);
+                        alert("Hero overlay updated successfully.");
+                      }}
+                      className="mt-4 bg-sage-600 text-white px-4 py-2 rounded-md font-medium hover:bg-sage-700 transition"
+                    >
+                      Save Overlay Settings
+                    </button>
                   </div>
                 </div>
 

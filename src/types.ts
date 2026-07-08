@@ -62,3 +62,27 @@ export type TestimonialVideo = {
   title: string;
   url: string;
 };
+
+export type Appointment = {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  date: string;
+  time: string;
+  problem?: string;
+  status: "pending" | "confirmed" | "completed";
+  meetLink?: string;
+  createdAt: string;
+};
+
+export type AppointmentSlot = {
+  date: string;
+  time: string;
+};
+
+export type AppointmentSettings = {
+  fee: number;
+  slots: AppointmentSlot[];
+  defaultMeetLink?: string;
+};

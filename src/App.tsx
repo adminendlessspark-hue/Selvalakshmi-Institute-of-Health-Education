@@ -1,7 +1,7 @@
 import React from "react";
 import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Navigation } from "./components/Navigation";
-import { FloatingWhatsApp } from "./components/FloatingWhatsApp";
+import { FloatingActions } from "./components/FloatingActions";
 import { Footer } from "./components/Footer";
 import { Home } from "./pages/Home";
 import { Courses } from "./pages/Courses";
@@ -13,7 +13,10 @@ import { Privacy } from "./pages/Privacy";
 import { Terms } from "./pages/Terms";
 import { Refund } from "./pages/Refund";
 import { WebinarLanding } from "./pages/WebinarLanding";
+import { Appointment } from "./pages/Appointment";
 import { StoreProvider, useStore } from "./context/StoreContext";
+
+import { PaymentResult } from "./pages/PaymentResult";
 
 function ProtectedAdmin({ children }: { children: React.ReactNode }) {
   const { isAdmin } = useStore();
@@ -36,11 +39,14 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/courses" element={<Courses />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/appointment" element={<Appointment />} />
               <Route path="/webinar" element={<WebinarLanding />} />
               <Route path="/login" element={<Login />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/refund" element={<Refund />} />
+              <Route path="/success" element={<PaymentResult status="success" />} />
+              <Route path="/cancel" element={<PaymentResult status="cancel" />} />
               <Route path="/dashboard" element={
                 <ProtectedStudent>
                   <Dashboard />
@@ -54,7 +60,7 @@ export default function App() {
             </Routes>
           </main>
           
-          <FloatingWhatsApp />
+          <FloatingActions />
           
           <Footer />
         </div>
