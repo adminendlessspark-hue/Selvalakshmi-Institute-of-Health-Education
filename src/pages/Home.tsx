@@ -222,21 +222,23 @@ export function Home() {
                 
                 const isAudio = video.type === "audio" || (video.type === undefined && (
                   displayUrl.toLowerCase().startsWith('data:audio/') || 
-                  displayUrl.toLowerCase().endsWith('.mp3') || 
-                  displayUrl.toLowerCase().endsWith('.wav') || 
-                  displayUrl.toLowerCase().endsWith('.m4a') || 
-                  displayUrl.toLowerCase().endsWith('.ogg') || 
-                  displayUrl.toLowerCase().endsWith('.aac')
+                  displayUrl.toLowerCase().includes('.mp3') || 
+                  displayUrl.toLowerCase().includes('.wav') || 
+                  displayUrl.toLowerCase().includes('.m4a') || 
+                  displayUrl.toLowerCase().includes('.ogg') || 
+                  displayUrl.toLowerCase().includes('.aac')
                 ));
 
                 const isUploadedVideo = !isAudio && (
                   video.type === "video" || 
                   displayUrl.toLowerCase().startsWith('data:video/') || 
-                  displayUrl.toLowerCase().endsWith('.mp4') || 
-                  displayUrl.toLowerCase().endsWith('.webm') || 
-                  displayUrl.toLowerCase().endsWith('.mov') || 
-                  displayUrl.toLowerCase().endsWith('.avi') || 
-                  displayUrl.toLowerCase().endsWith('.mkv')
+                  displayUrl.toLowerCase().includes('.mp4') || 
+                  displayUrl.toLowerCase().includes('.webm') || 
+                  displayUrl.toLowerCase().includes('.mov') || 
+                  displayUrl.toLowerCase().includes('.avi') || 
+                  displayUrl.toLowerCase().includes('.mkv') ||
+                  displayUrl.includes('firebasestorage.googleapis.com') ||
+                  (!displayUrl.includes('youtube.com') && !displayUrl.includes('youtu.be') && displayUrl.startsWith('http'))
                 );
 
                 return (
@@ -404,21 +406,23 @@ export function Home() {
                 }
                 const isAudio = sharedTestimony.type === "audio" || (sharedTestimony.type === undefined && (
                   displayUrl.toLowerCase().startsWith('data:audio/') || 
-                  displayUrl.toLowerCase().endsWith('.mp3') || 
-                  displayUrl.toLowerCase().endsWith('.wav') || 
-                  displayUrl.toLowerCase().endsWith('.m4a') || 
-                  displayUrl.toLowerCase().endsWith('.ogg') || 
-                  displayUrl.toLowerCase().endsWith('.aac')
+                  displayUrl.toLowerCase().includes('.mp3') || 
+                  displayUrl.toLowerCase().includes('.wav') || 
+                  displayUrl.toLowerCase().includes('.m4a') || 
+                  displayUrl.toLowerCase().includes('.ogg') || 
+                  displayUrl.toLowerCase().includes('.aac')
                 ));
 
                 const isUploadedVideo = !isAudio && (
                   sharedTestimony.type === "video" || 
                   displayUrl.toLowerCase().startsWith('data:video/') || 
-                  displayUrl.toLowerCase().endsWith('.mp4') || 
-                  displayUrl.toLowerCase().endsWith('.webm') || 
-                  displayUrl.toLowerCase().endsWith('.mov') || 
-                  displayUrl.toLowerCase().endsWith('.avi') || 
-                  displayUrl.toLowerCase().endsWith('.mkv')
+                  displayUrl.toLowerCase().includes('.mp4') || 
+                  displayUrl.toLowerCase().includes('.webm') || 
+                  displayUrl.toLowerCase().includes('.mov') || 
+                  displayUrl.toLowerCase().includes('.avi') || 
+                  displayUrl.toLowerCase().includes('.mkv') ||
+                  displayUrl.includes('firebasestorage.googleapis.com') ||
+                  (!displayUrl.includes('youtube.com') && !displayUrl.includes('youtu.be') && displayUrl.startsWith('http'))
                 );
 
                 if (isAudio) {

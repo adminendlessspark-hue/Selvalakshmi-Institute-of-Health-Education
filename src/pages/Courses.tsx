@@ -46,10 +46,13 @@ function CourseCard({ course, formatDateString }: CourseCardProps) {
   const getAutoplayUrl = (url: string) => {
     if (!url) return "";
     let embedUrl = url;
-    if (url.includes("youtube.com/watch?v=")) {
-      embedUrl = url.replace("youtube.com/watch?v=", "youtube.com/embed/");
-    } else if (url.includes("youtu.be/")) {
-      embedUrl = url.replace("youtu.be/", "youtube.com/embed/");
+    if (embedUrl && !/^https?:\/\//i.test(embedUrl)) {
+      embedUrl = "https://" + embedUrl;
+    }
+    if (embedUrl.includes("youtube.com/watch?v=")) {
+      embedUrl = embedUrl.replace("youtube.com/watch?v=", "youtube.com/embed/");
+    } else if (embedUrl.includes("youtu.be/")) {
+      embedUrl = embedUrl.replace("youtu.be/", "youtube.com/embed/");
     }
     const separator = embedUrl.includes("?") ? "&" : "?";
     return `${embedUrl}${separator}autoplay=1`;
@@ -89,19 +92,21 @@ function CourseCard({ course, formatDateString }: CourseCardProps) {
           (() => {
             const videoUrl = course.videoUrl || "";
             const isAudio = videoUrl.toLowerCase().startsWith('data:audio/') || 
-                            videoUrl.toLowerCase().endsWith('.mp3') || 
-                            videoUrl.toLowerCase().endsWith('.wav') || 
-                            videoUrl.toLowerCase().endsWith('.m4a') || 
-                            videoUrl.toLowerCase().endsWith('.ogg') || 
-                            videoUrl.toLowerCase().endsWith('.aac');
+                            videoUrl.toLowerCase().includes('.mp3') || 
+                            videoUrl.toLowerCase().includes('.wav') || 
+                            videoUrl.toLowerCase().includes('.m4a') || 
+                            videoUrl.toLowerCase().includes('.ogg') || 
+                            videoUrl.toLowerCase().includes('.aac');
 
             const isUploadedVideo = !isAudio && (
               videoUrl.toLowerCase().startsWith('data:video/') || 
-              videoUrl.toLowerCase().endsWith('.mp4') || 
-              videoUrl.toLowerCase().endsWith('.webm') || 
-              videoUrl.toLowerCase().endsWith('.mov') || 
-              videoUrl.toLowerCase().endsWith('.avi') || 
-              videoUrl.toLowerCase().endsWith('.mkv')
+              videoUrl.toLowerCase().includes('.mp4') || 
+              videoUrl.toLowerCase().includes('.webm') || 
+              videoUrl.toLowerCase().includes('.mov') || 
+              videoUrl.toLowerCase().includes('.avi') || 
+              videoUrl.toLowerCase().includes('.mkv') ||
+              videoUrl.includes('firebasestorage.googleapis.com') ||
+              (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be') && videoUrl.startsWith('http'))
             );
 
             if (isAudio) {

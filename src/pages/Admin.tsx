@@ -2060,20 +2060,22 @@ ${videoLineTa}${testimonyLineTa}${posterLineTa}
                                         const isUploaded = videoUrl.startsWith("data:");
                                         const isAudio = videoUrl.toLowerCase().startsWith('data:audio/') || 
                                                         (!isUploaded && (
-                                                          videoUrl.toLowerCase().endsWith('.mp3') || 
-                                                          videoUrl.toLowerCase().endsWith('.wav') || 
-                                                          videoUrl.toLowerCase().endsWith('.m4a') || 
-                                                          videoUrl.toLowerCase().endsWith('.ogg') || 
-                                                          videoUrl.toLowerCase().endsWith('.aac')
+                                                          videoUrl.toLowerCase().includes('.mp3') || 
+                                                          videoUrl.toLowerCase().includes('.wav') || 
+                                                          videoUrl.toLowerCase().includes('.m4a') || 
+                                                          videoUrl.toLowerCase().includes('.ogg') || 
+                                                          videoUrl.toLowerCase().includes('.aac')
                                                         ));
 
                                         const isUploadedVideo = !isAudio && (
                                           isUploaded ||
-                                          videoUrl.toLowerCase().endsWith('.mp4') || 
-                                          videoUrl.toLowerCase().endsWith('.webm') || 
-                                          videoUrl.toLowerCase().endsWith('.mov') || 
-                                          videoUrl.toLowerCase().endsWith('.avi') || 
-                                          videoUrl.toLowerCase().endsWith('.mkv')
+                                          videoUrl.toLowerCase().includes('.mp4') || 
+                                          videoUrl.toLowerCase().includes('.webm') || 
+                                          videoUrl.toLowerCase().includes('.mov') || 
+                                          videoUrl.toLowerCase().includes('.avi') || 
+                                          videoUrl.toLowerCase().includes('.mkv') ||
+                                          videoUrl.includes('firebasestorage.googleapis.com') ||
+                                          (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be') && videoUrl.startsWith('http'))
                                         );
 
                                         if (isAudio) {
@@ -2101,10 +2103,13 @@ ${videoLineTa}${testimonyLineTa}${posterLineTa}
                                         } else {
                                           // YouTube embed link
                                           let embedUrl = videoUrl;
-                                          if (videoUrl.includes("youtube.com/watch?v=")) {
-                                            embedUrl = videoUrl.replace("youtube.com/watch?v=", "youtube.com/embed/");
-                                          } else if (videoUrl.includes("youtu.be/")) {
-                                            embedUrl = videoUrl.replace("youtu.be/", "youtube.com/embed/");
+                                          if (embedUrl && !/^https?:\/\//i.test(embedUrl)) {
+                                            embedUrl = "https://" + embedUrl;
+                                          }
+                                          if (embedUrl.includes("youtube.com/watch?v=")) {
+                                            embedUrl = embedUrl.replace("youtube.com/watch?v=", "youtube.com/embed/");
+                                          } else if (embedUrl.includes("youtu.be/")) {
+                                            embedUrl = embedUrl.replace("youtu.be/", "youtube.com/embed/");
                                           }
                                           return (
                                             <div className="w-full aspect-video bg-black">

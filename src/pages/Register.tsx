@@ -481,20 +481,22 @@ export function Register() {
                       const isUploaded = videoUrl.startsWith("data:");
                       const isAudio = videoUrl.toLowerCase().startsWith('data:audio/') || 
                                       (!isUploaded && (
-                                        videoUrl.toLowerCase().endsWith('.mp3') || 
-                                        videoUrl.toLowerCase().endsWith('.wav') || 
-                                        videoUrl.toLowerCase().endsWith('.m4a') || 
-                                        videoUrl.toLowerCase().endsWith('.ogg') || 
-                                        videoUrl.toLowerCase().endsWith('.aac')
+                                        videoUrl.toLowerCase().includes('.mp3') || 
+                                        videoUrl.toLowerCase().includes('.wav') || 
+                                        videoUrl.toLowerCase().includes('.m4a') || 
+                                        videoUrl.toLowerCase().includes('.ogg') || 
+                                        videoUrl.toLowerCase().includes('.aac')
                                       ));
 
                       const isUploadedVideo = !isAudio && (
                         isUploaded ||
-                        videoUrl.toLowerCase().endsWith('.mp4') || 
-                        videoUrl.toLowerCase().endsWith('.webm') || 
-                        videoUrl.toLowerCase().endsWith('.mov') || 
-                        videoUrl.toLowerCase().endsWith('.avi') || 
-                        videoUrl.toLowerCase().endsWith('.mkv')
+                        videoUrl.toLowerCase().includes('.mp4') || 
+                        videoUrl.toLowerCase().includes('.webm') || 
+                        videoUrl.toLowerCase().includes('.mov') || 
+                        videoUrl.toLowerCase().includes('.avi') || 
+                        videoUrl.toLowerCase().includes('.mkv') ||
+                        videoUrl.includes('firebasestorage.googleapis.com') ||
+                        (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be') && videoUrl.startsWith('http'))
                       );
 
                       if (isAudio) {
@@ -517,10 +519,13 @@ export function Register() {
                         );
                       } else {
                         let embedUrl = videoUrl;
-                        if (videoUrl.includes("youtube.com/watch?v=")) {
-                          embedUrl = videoUrl.replace("youtube.com/watch?v=", "youtube.com/embed/");
-                        } else if (videoUrl.includes("youtu.be/")) {
-                          embedUrl = videoUrl.replace("youtu.be/", "youtube.com/embed/");
+                        if (embedUrl && !/^https?:\/\//i.test(embedUrl)) {
+                          embedUrl = "https://" + embedUrl;
+                        }
+                        if (embedUrl.includes("youtube.com/watch?v=")) {
+                          embedUrl = embedUrl.replace("youtube.com/watch?v=", "youtube.com/embed/");
+                        } else if (embedUrl.includes("youtu.be/")) {
+                          embedUrl = embedUrl.replace("youtu.be/", "youtube.com/embed/");
                         }
                         return (
                           <div className="w-full aspect-video">
@@ -553,7 +558,10 @@ export function Register() {
 
                 {/* Explicit Shareable / Direct Registration Link (Required) */}
                 {(() => {
-                  const regUrl = `${window.location.origin}${window.location.pathname}#/register?course=${selectedCourseObj.id}`;
+                  const regUrl = `${window.location.origin}/register?course=${encodeURIComponent(selectedCourseObj.id)}`;
+                  const courseFeeText = selectedCourseObj.fee 
+                    ? (selectedCourseObj.fee.toLowerCase() === 'free' || selectedCourseObj.fee.includes('₹') ? selectedCourseObj.fee : `₹${selectedCourseObj.fee}`)
+                    : 'N/A';
                   return (
                     <div className="mt-6 p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-3">
                       <div className="flex items-center justify-between">
@@ -603,8 +611,8 @@ export function Register() {
                             type="button"
                             onClick={() => {
                               const shareMsg = language === "en"
-                                ? `🌟 Join our brand new program: *${selectedCourseObj.title}*! Register here:\n🔗 ${regUrl}`
-                                : `🌟 எங்களது புதிய வகுப்பில் இணையுங்கள்: *${selectedCourseObj.title}*! இப்போதே பதிவு செய்ய:\n🔗 ${regUrl}`;
+                                ? `🌟 *Join our program: ${selectedCourseObj.title}* 🌟\n\n⏱️ *Duration:* ${selectedCourseObj.duration || 'N/A'}\n💰 *Fee:* ${courseFeeText}\n\n✨ *Course Overview & Highlights:* \n${selectedCourseObj.description}\n\n👇 *Register here:* \n🔗 ${regUrl}`
+                                : `🌟 *எங்களது புதிய வகுப்பில் இணையுங்கள்: ${selectedCourseObj.title}* 🌟\n\n⏱️ *கால அளவு:* ${selectedCourseObj.duration || 'N/A'}\n💰 *கட்டணம்:* ${courseFeeText}\n\n✨ *வகுப்பு அறிமுகம் & சிறப்பம்சங்கள்:* \n${selectedCourseObj.description}\n\n👇 *இப்போதே பதிவு செய்ய:* \n🔗 ${regUrl}`;
                               const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
                               window.open(whatsappUrl, '_blank');
                             }}
