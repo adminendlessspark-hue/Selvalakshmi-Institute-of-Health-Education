@@ -569,8 +569,8 @@ export function Register() {
 
                 {/* Explicit Shareable / Direct Registration Link (Required) */}
                 {(() => {
-                  const displayUrl = `${window.location.origin}/register?course=${selectedCourseObj.id}`;
-                  const encodedUrl = `${window.location.origin}/register?course=${encodeURIComponent(selectedCourseObj.id)}`;
+                  const displayUrl = `${window.location.origin}/#/register?course=${selectedCourseObj.id}`;
+                  const encodedUrl = `${window.location.origin}/#/register?course=${encodeURIComponent(selectedCourseObj.id)}`;
                   const courseFeeText = selectedCourseObj.fee 
                     ? (selectedCourseObj.fee.toLowerCase() === 'free' || selectedCourseObj.fee.includes('₹') ? selectedCourseObj.fee : `₹${selectedCourseObj.fee}`)
                     : 'N/A';
@@ -622,9 +622,15 @@ export function Register() {
                           <button
                             type="button"
                             onClick={() => {
+                              const videoLineEn = selectedCourseObj.videoUrl ? `\n\n📺 *Watch Intro Video:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
+                              const posterLineEn = (selectedCourseObj.imageUrl && !selectedCourseObj.imageUrl.startsWith("data:")) ? `\n\n🖼️ *Course Poster:* \n🔗 ${selectedCourseObj.imageUrl}` : "";
+                              
+                              const videoLineTa = selectedCourseObj.videoUrl ? `\n\n📺 *அறிமுக வீடியோவை பார்க்க:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
+                              const posterLineTa = (selectedCourseObj.imageUrl && !selectedCourseObj.imageUrl.startsWith("data:")) ? `\n\n🖼️ *வகுப்பு போஸ்டர்:* \n🔗 ${selectedCourseObj.imageUrl}` : "";
+
                               const shareMsg = language === "en"
-                                ? `🌟 *Join our program: ${selectedCourseObj.title}* 🌟\n\n⏱️ *Duration:* ${selectedCourseObj.duration || 'N/A'}\n💰 *Fee:* ${courseFeeText}\n\n✨ *Course Overview & Highlights:* \n${selectedCourseObj.description}\n\n👇 *Register here:* \n🔗 ${encodedUrl}`
-                                : `🌟 *எங்களது புதிய வகுப்பில் இணையுங்கள்: ${selectedCourseObj.title}* 🌟\n\n⏱️ *கால அளவு:* ${selectedCourseObj.duration || 'N/A'}\n💰 *கட்டணம்:* ${courseFeeText}\n\n✨ *வகுப்பு அறிமுகம் & சிறப்பம்சங்கள்:* \n${selectedCourseObj.description}\n\n👇 *இப்போதே பதிவு செய்ய:* \n🔗 ${encodedUrl}`;
+                                ? `🌟 *Join our program: ${selectedCourseObj.title}* 🌟\n\n⏱️ *Duration:* ${selectedCourseObj.duration || 'N/A'}\n💰 *Fee:* ${courseFeeText}${videoLineEn}${posterLineEn}\n\n✨ *Course Overview & Highlights:* \n${selectedCourseObj.description}\n\n👇 *Register here:* \n🔗 ${encodedUrl}`
+                                : `🌟 *எங்களது புதிய வகுப்பில் இணையுங்கள்: ${selectedCourseObj.title}* 🌟\n\n⏱️ *கால அளவு:* ${selectedCourseObj.duration || 'N/A'}\n💰 *கட்டணம்:* ${courseFeeText}${videoLineTa}${posterLineTa}\n\n✨ *வகுப்பு அறிமுகம் & சிறப்பம்சங்கள்:* \n${selectedCourseObj.description}\n\n👇 *இப்போதே பதிவு செய்ய:* \n🔗 ${encodedUrl}`;
                               const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
                               window.open(whatsappUrl, '_blank');
                             }}
