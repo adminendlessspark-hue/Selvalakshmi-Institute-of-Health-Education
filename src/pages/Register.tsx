@@ -558,7 +558,7 @@ export function Register() {
 
                 {/* Explicit Shareable / Direct Registration Link (Required) */}
                 {(() => {
-                  const regUrl = `${window.location.origin}/register?course=${encodeURIComponent(selectedCourseObj.id)}`;
+                  const regUrl = `${window.location.origin}/register?course=${selectedCourseObj.id}`;
                   const courseFeeText = selectedCourseObj.fee 
                     ? (selectedCourseObj.fee.toLowerCase() === 'free' || selectedCourseObj.fee.includes('₹') ? selectedCourseObj.fee : `₹${selectedCourseObj.fee}`)
                     : 'N/A';

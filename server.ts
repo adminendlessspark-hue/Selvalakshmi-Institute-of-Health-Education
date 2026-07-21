@@ -21,6 +21,7 @@ app.get("/register", async (req, res, next) => {
   let description = "Join our upcoming naturopathy and Muthra acupressure batches.";
   let imageUrl = "";
   let videoUrl = "";
+  let videoType = "text/html";
 
   if (courseId) {
     try {
@@ -34,6 +35,7 @@ app.get("/register", async (req, res, next) => {
         const courseFee = fields.fee?.stringValue || "";
         const courseDuration = fields.duration?.stringValue || "";
         const courseVideoUrl = fields.videoUrl?.stringValue || "";
+        const courseImageUrl = fields.imageUrl?.stringValue || "";
         
         if (courseTitle) {
           title = courseTitle;
@@ -45,23 +47,37 @@ app.get("/register", async (req, res, next) => {
           
           description = `⏱️ Duration: ${courseDuration || 'N/A'} | 💰 Fee: ${feesText || 'N/A'}\n\n✨ Course Highlights:\n${courseDescription}`;
           
+          if (courseImageUrl && courseImageUrl.startsWith("http")) {
+            imageUrl = courseImageUrl;
+          }
+
           if (courseVideoUrl) {
-            videoUrl = courseVideoUrl;
+            let isYouTube = false;
+            let youtubeId = "";
+            
             if (courseVideoUrl.includes("youtube.com/watch?v=")) {
+              isYouTube = true;
               const match = courseVideoUrl.match(/v=([^&]+)/);
-              if (match) {
-                imageUrl = `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`;
-              }
+              if (match) youtubeId = match[1];
             } else if (courseVideoUrl.includes("youtu.be/")) {
+              isYouTube = true;
               const match = courseVideoUrl.match(/youtu\.be\/([^?&#\s]+)/);
-              if (match) {
-                imageUrl = `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`;
-              }
+              if (match) youtubeId = match[1];
             } else if (courseVideoUrl.includes("youtube.com/embed/")) {
+              isYouTube = true;
               const match = courseVideoUrl.match(/embed\/([^?&#\s]+)/);
-              if (match) {
-                imageUrl = `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`;
+              if (match) youtubeId = match[1];
+            }
+
+            if (isYouTube) {
+              videoUrl = youtubeId ? `https://www.youtube.com/embed/${youtubeId}` : courseVideoUrl;
+              videoType = "text/html";
+              if (youtubeId && !imageUrl) {
+                imageUrl = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
               }
+            } else if (courseVideoUrl.startsWith("http")) {
+              videoUrl = courseVideoUrl;
+              videoType = "video/mp4";
             }
           }
         }
@@ -78,7 +94,7 @@ app.get("/register", async (req, res, next) => {
       if (globalRes.ok) {
         const globalData = await globalRes.json();
         const logoUrl = globalData.fields?.logoUrl?.stringValue;
-        if (logoUrl) {
+        if (logoUrl && logoUrl.startsWith("http")) {
           imageUrl = logoUrl;
         }
       }
@@ -86,6 +102,10 @@ app.get("/register", async (req, res, next) => {
       console.error("Error fetching global settings:", err);
     }
   }
+
+  // Double check that we don't output data URIs in open graph tags
+  if (imageUrl && imageUrl.startsWith("data:")) imageUrl = "";
+  if (videoUrl && videoUrl.startsWith("data:")) videoUrl = "";
 
   // Read index.html (depending on env)
   let htmlPath = "";
@@ -110,14 +130,25 @@ app.get("/register", async (req, res, next) => {
 
   const metaTags = `
     <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="video.other" />
+    <meta property="og:type" content="${videoUrl ? 'video.other' : 'website'}" />
     <meta property="og:title" content="${cleanTitle}" />
     <meta property="og:description" content="${cleanDescription}" />
     <meta property="og:url" content="${currentUrl}" />
-    ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ''}
-    ${videoUrl ? `<meta property="og:video" content="${videoUrl}" />` : ''}
-    <meta property="og:video:type" content="text/html" />
     <meta property="og:site_name" content="Selvalakshmi Institute" />
+    ${imageUrl ? `
+    <meta property="og:image" content="${imageUrl}" />
+    <meta property="og:image:secure_url" content="${imageUrl}" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="720" />
+    ` : ''}
+    ${videoUrl ? `
+    <meta property="og:video" content="${videoUrl}" />
+    <meta property="og:video:secure_url" content="${videoUrl}" />
+    <meta property="og:video:type" content="${videoType}" />
+    <meta property="og:video:width" content="1280" />
+    <meta property="og:video:height" content="720" />
+    ` : ''}
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
@@ -126,7 +157,7 @@ app.get("/register", async (req, res, next) => {
     ${imageUrl ? `<meta property="twitter:image" content="${imageUrl}" />` : ''}
   `;
 
-  html = html.replace("<title>Selvalakshmi Institute</title>", `<title>${cleanTitle}</title>`);
+  html = html.replace(/<title>[^<]*<\/title>/i, `<title>${cleanTitle}</title>`);
   html = html.replace("</head>", `${metaTags}\n</head>`);
 
   res.send(html);
