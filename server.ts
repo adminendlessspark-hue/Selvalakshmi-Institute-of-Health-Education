@@ -15,7 +15,14 @@ app.use(express.json());
 app.get("/register", async (req, res, next) => {
   const projectId = "gen-lang-client-0774589767";
   const databaseId = "ai-studio-selvalakshmifoun-06cf7884-eb4f-48b6-b930-3989fc202d2d";
-  const courseId = req.query.course as string;
+  let courseId = req.query.course as string;
+  if (courseId) {
+    try {
+      courseId = decodeURIComponent(courseId);
+    } catch (e) {
+      // already decoded or malformed
+    }
+  }
 
   let title = "Selvalakshmi Institute";
   let description = "Join our upcoming naturopathy and Muthra acupressure batches.";
