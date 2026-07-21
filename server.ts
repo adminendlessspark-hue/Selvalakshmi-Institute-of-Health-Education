@@ -111,7 +111,9 @@ app.get("/register", async (req, res, next) => {
   }
 
   // Double check that we don't output data URIs in open graph tags
-  if (imageUrl && imageUrl.startsWith("data:")) imageUrl = "";
+  if (!imageUrl || imageUrl.startsWith("data:")) {
+    imageUrl = "https://www.selvalakshmihealtheducation.in/whatsapp_share_preview.jpg";
+  }
   if (videoUrl && videoUrl.startsWith("data:")) videoUrl = "";
 
   // Read index.html (depending on env)

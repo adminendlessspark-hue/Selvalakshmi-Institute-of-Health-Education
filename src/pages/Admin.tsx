@@ -208,7 +208,7 @@ export function Admin() {
 
       const publicBaseUrl = getPublicBaseUrl();
       const cleanBaseUrl = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
-      const registerUrl = `${cleanBaseUrl}/#/register?course=${course.id}`;
+      const registerUrl = `${cleanBaseUrl}/register?course=${course.id}`;
 
       const hookText = shareTemplate ? `${shareTemplate}\n\n` : '';
 
