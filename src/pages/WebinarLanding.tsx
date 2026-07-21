@@ -39,7 +39,7 @@ export function WebinarLanding() {
     <div className="min-h-screen bg-[#0a3f24] font-sans pb-12 flex flex-col justify-center">
       {/* Top Header */}
       <header className="w-full p-4 sm:p-6 flex justify-between items-center z-10 relative">
-        <div className="w-24 h-24 sm:w-28 sm:h-28 bg-white rounded-full flex items-center justify-center p-2 shadow-lg shrink-0 overflow-hidden">
+        <div className="w-24 h-24 sm:w-28 sm:h-28 bg-white rounded-full flex items-center justify-center p-4 shadow-lg shrink-0 overflow-hidden">
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
           ) : (

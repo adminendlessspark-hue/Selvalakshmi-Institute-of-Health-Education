@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Course, Student, Video, TestimonialVideo, Appointment, AppointmentSettings } from "../types";
 import { db, auth } from "../lib/firebase";
-import { collection, doc, onSnapshot, setDoc, deleteDoc, runTransaction } from "firebase/firestore";
+import { collection, doc, onSnapshot, setDoc, deleteDoc, runTransaction, getDocs } from "firebase/firestore";
 
 export enum OperationType {
   CREATE = 'create',
@@ -70,6 +70,7 @@ type StoreContextType = {
   youtubeUrl: string | null;
   instagramUrl: string | null;
   facebookUrl: string | null;
+  shareTemplate: string | null;
   muthraIconUrl: string | null;
   acupressureIconUrl: string | null;
   foodIconUrl: string | null;
@@ -93,9 +94,9 @@ type StoreContextType = {
   addHeroImage: (url: string) => Promise<void>;
   removeHeroImage: (index: number) => Promise<void>;
   updateGpayQr: (url: string) => Promise<void>;
-  addTestimonialVideo: (title: string, url: string) => Promise<void>;
+  addTestimonialVideo: (title: string, url: string, type?: "audio" | "video" | "link") => Promise<void>;
   removeTestimonialVideo: (id: string) => Promise<void>;
-  updateSocialLinks: (whatsapp: string, youtube: string, instagram: string, facebook: string) => Promise<void>;
+  updateSocialLinks: (whatsapp: string, youtube: string, instagram: string, facebook: string, shareTemplate: string) => Promise<void>;
   updateFeatureIcons: (muthra: string | null, acupressure: string | null, food: string | null) => Promise<void>;
   updateWebinarVisible: (v: boolean) => Promise<void>;
   appointmentSettings: AppointmentSettings | null;
@@ -122,6 +123,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null);
   const [instagramUrl, setInstagramUrl] = useState<string | null>(null);
   const [facebookUrl, setFacebookUrl] = useState<string | null>(null);
+  const [shareTemplate, setShareTemplate] = useState<string | null>(null);
   const [muthraIconUrl, setMuthraIconUrl] = useState<string | null>(null);
   const [acupressureIconUrl, setAcupressureIconUrl] = useState<string | null>(null);
   const [foodIconUrl, setFoodIconUrl] = useState<string | null>(null);
@@ -141,9 +143,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Load from Firestore on mount
   useEffect(() => {
-    const unsubCourses = onSnapshot(collection(db, "courses"), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
-      setCourses(data);
+    const unsubCourses = onSnapshot(collection(db, "courses"), async (snapshot) => {
+      const rawData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      try {
+        const resolvedData = await Promise.all(rawData.map(async (item) => {
+          if (item.isChunked) {
+            try {
+              const chunksSnap = await getDocs(collection(db, "courses", item.id, "chunks"));
+              const chunksDocs = chunksSnap.docs.map(d => d.data());
+              chunksDocs.sort((a, b) => a.index - b.index);
+              const fullUrl = chunksDocs.map(c => c.text).join("");
+              return {
+                ...item,
+                videoUrl: fullUrl,
+                isChunked: true
+              } as Course;
+            } catch (err) {
+              console.error("Error loading chunks for course " + item.id, err);
+              return {
+                ...item,
+                videoUrl: "",
+                isChunked: true
+              } as Course;
+            }
+          }
+          return item as Course;
+        }));
+        setCourses(resolvedData);
+      } catch (err) {
+        console.error("Error resolving courses:", err);
+      }
     }, (error) => console.error(error));
 
     const unsubStudents = onSnapshot(collection(db, "students"), (snapshot) => {
@@ -156,14 +185,72 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setAppointments(data);
     }, (error) => console.error(error));
 
-    const unsubVideos = onSnapshot(collection(db, "videos"), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Video));
-      setVideos(data);
+    const unsubVideos = onSnapshot(collection(db, "videos"), async (snapshot) => {
+      const rawData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      try {
+        const resolvedData = await Promise.all(rawData.map(async (item) => {
+          if (item.isChunked) {
+            try {
+              const chunksSnap = await getDocs(collection(db, "videos", item.id, "chunks"));
+              const chunksDocs = chunksSnap.docs.map(d => d.data());
+              chunksDocs.sort((a, b) => a.index - b.index);
+              const fullUrl = chunksDocs.map(c => c.text).join("");
+              return {
+                ...item,
+                url: fullUrl,
+                isChunked: true
+              } as Video;
+            } catch (err) {
+              console.error("Error loading chunks for video " + item.id, err);
+              return {
+                ...item,
+                url: "",
+                isChunked: true
+              } as Video;
+            }
+          }
+          return item as Video;
+        }));
+        setVideos(resolvedData);
+      } catch (err) {
+        console.error("Error resolving videos:", err);
+      }
     }, (error) => console.error(error));
 
-    const unsubTestimonial = onSnapshot(collection(db, "testimonialVideos"), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TestimonialVideo));
-      setTestimonialVideos(data);
+    const unsubTestimonial = onSnapshot(collection(db, "testimonialVideos"), async (snapshot) => {
+      const rawData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      try {
+        const resolvedData = await Promise.all(rawData.map(async (item) => {
+          if (item.isChunked) {
+            try {
+              const chunksSnap = await getDocs(collection(db, "testimonialVideos", item.id, "chunks"));
+              const chunksDocs = chunksSnap.docs.map(d => d.data());
+              chunksDocs.sort((a, b) => a.index - b.index);
+              const fullUrl = chunksDocs.map(c => c.text).join("");
+              return {
+                id: item.id,
+                title: item.title,
+                url: fullUrl,
+                isChunked: true,
+                type: item.type
+              } as TestimonialVideo;
+            } catch (err) {
+              console.error("Error loading chunks for " + item.id, err);
+              return {
+                id: item.id,
+                title: item.title,
+                url: "",
+                isChunked: true,
+                type: item.type
+              } as TestimonialVideo;
+            }
+          }
+          return item as TestimonialVideo;
+        }));
+        setTestimonialVideos(resolvedData);
+      } catch (err) {
+        console.error("Error resolving testimonials:", err);
+      }
     }, (error) => console.error(error));
 
     const unsubSettings = onSnapshot(doc(db, "settings", "global"), (docSnap) => {
@@ -182,6 +269,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setYoutubeUrl(data.youtubeUrl || null);
         setInstagramUrl(data.instagramUrl || null);
         setFacebookUrl(data.facebookUrl || null);
+        setShareTemplate(data.shareTemplate || null);
         
         setMuthraIconUrl(data.muthraIconUrl || null);
         setAcupressureIconUrl(data.acupressureIconUrl || null);
@@ -216,7 +304,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const addCourse = async (course: Course) => {
     try {
-      await setDoc(doc(collection(db, "courses"), course.id), course);
+      const videoUrl = course.videoUrl || "";
+      if (videoUrl.length > 700000) {
+        const chunkSize = 600000;
+        const totalChunks = Math.ceil(videoUrl.length / chunkSize);
+        
+        for (let i = 0; i < totalChunks; i++) {
+          const chunkText = videoUrl.substring(i * chunkSize, (i + 1) * chunkSize);
+          await setDoc(doc(db, "courses", course.id, "chunks", String(i)), {
+            index: i,
+            text: chunkText
+          });
+        }
+        
+        const courseToSave = { ...course, videoUrl: "chunked", isChunked: true };
+        await setDoc(doc(collection(db, "courses"), course.id), courseToSave);
+      } else {
+        await setDoc(doc(collection(db, "courses"), course.id), course);
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `courses/${course.id}`);
     }
@@ -224,7 +329,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateCourse = async (updatedCourse: Course) => {
     try {
-      await setDoc(doc(db, "courses", updatedCourse.id), updatedCourse);
+      // Clear out any old chunks to avoid contamination
+      try {
+        const chunksSnap = await getDocs(collection(db, "courses", updatedCourse.id, "chunks"));
+        for (const d of chunksSnap.docs) {
+          await deleteDoc(doc(db, "courses", updatedCourse.id, "chunks", d.id));
+        }
+      } catch (e) {
+        console.error("Could not delete old course chunks", e);
+      }
+
+      const videoUrl = updatedCourse.videoUrl || "";
+      if (videoUrl.length > 700000) {
+        const chunkSize = 600000;
+        const totalChunks = Math.ceil(videoUrl.length / chunkSize);
+        
+        for (let i = 0; i < totalChunks; i++) {
+          const chunkText = videoUrl.substring(i * chunkSize, (i + 1) * chunkSize);
+          await setDoc(doc(db, "courses", updatedCourse.id, "chunks", String(i)), {
+            index: i,
+            text: chunkText
+          });
+        }
+        
+        const courseToSave = { ...updatedCourse, videoUrl: "chunked", isChunked: true };
+        await setDoc(doc(db, "courses", updatedCourse.id), courseToSave);
+      } else {
+        const courseToSave = { ...updatedCourse, isChunked: false };
+        await setDoc(doc(db, "courses", updatedCourse.id), courseToSave);
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `courses/${updatedCourse.id}`);
     }
@@ -232,6 +365,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const deleteCourse = async (id: string) => {
     try {
+      const chunksSnap = await getDocs(collection(db, "courses", id, "chunks"));
+      for (const d of chunksSnap.docs) {
+        await deleteDoc(doc(db, "courses", id, "chunks", d.id));
+      }
       await deleteDoc(doc(db, "courses", id));
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `courses/${id}`);
@@ -304,20 +441,74 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const addVideo = async (videoData: Omit<Video, "id">) => {
+    const newId = `vid-${Date.now()}`;
     const newVideo: Video = {
       ...videoData,
-      id: `vid-${Date.now()}`,
+      id: newId,
     };
     try {
-      await setDoc(doc(collection(db, "videos"), newVideo.id), newVideo);
+      const url = newVideo.url || "";
+      if (url.length > 700000) {
+        const chunkSize = 600000;
+        const totalChunks = Math.ceil(url.length / chunkSize);
+        
+        for (let i = 0; i < totalChunks; i++) {
+          const chunkText = url.substring(i * chunkSize, (i + 1) * chunkSize);
+          await setDoc(doc(db, "videos", newId, "chunks", String(i)), {
+            index: i,
+            text: chunkText
+          });
+        }
+        
+        const videoToSave = { ...newVideo, url: "chunked", isChunked: true };
+        await setDoc(doc(collection(db, "videos"), newId), videoToSave);
+      } else {
+        await setDoc(doc(collection(db, "videos"), newId), newVideo);
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `videos/${newVideo.id}`);
+      handleFirestoreError(err, OperationType.WRITE, `videos/${newId}`);
     }
   };
 
   const updateVideo = async (updatedVideo: Video) => {
     try {
-      await setDoc(doc(db, "videos", updatedVideo.id), updatedVideo);
+      const url = updatedVideo.url || "";
+      if (url.length > 700000) {
+        try {
+          const chunksSnap = await getDocs(collection(db, "videos", updatedVideo.id, "chunks"));
+          for (const d of chunksSnap.docs) {
+            await deleteDoc(doc(db, "videos", updatedVideo.id, "chunks", d.id));
+          }
+        } catch (e) {
+          console.error("Could not delete old chunks", e);
+        }
+
+        const chunkSize = 600000;
+        const totalChunks = Math.ceil(url.length / chunkSize);
+        
+        for (let i = 0; i < totalChunks; i++) {
+          const chunkText = url.substring(i * chunkSize, (i + 1) * chunkSize);
+          await setDoc(doc(db, "videos", updatedVideo.id, "chunks", String(i)), {
+            index: i,
+            text: chunkText
+          });
+        }
+        
+        const videoToSave = { ...updatedVideo, url: "chunked", isChunked: true };
+        await setDoc(doc(db, "videos", updatedVideo.id), videoToSave);
+      } else {
+        try {
+          const chunksSnap = await getDocs(collection(db, "videos", updatedVideo.id, "chunks"));
+          for (const d of chunksSnap.docs) {
+            await deleteDoc(doc(db, "videos", updatedVideo.id, "chunks", d.id));
+          }
+        } catch (e) {
+          console.error("Could not delete old chunks", e);
+        }
+
+        const videoToSave = { ...updatedVideo, isChunked: false };
+        await setDoc(doc(db, "videos", updatedVideo.id), videoToSave);
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `videos/${updatedVideo.id}`);
     }
@@ -325,6 +516,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const deleteVideo = async (id: string) => {
     try {
+      try {
+        const chunksSnap = await getDocs(collection(db, "videos", id, "chunks"));
+        for (const d of chunksSnap.docs) {
+          await deleteDoc(doc(db, "videos", id, "chunks", d.id));
+        }
+      } catch (e) {
+        console.error("Could not delete chunks on deleteVideo", e);
+      }
       await deleteDoc(doc(db, "videos", id));
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `videos/${id}`);
@@ -388,30 +587,58 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addTestimonialVideo = async (title: string, url: string) => {
-    const newVid = { id: `vid-${Date.now()}`, title, url };
+  const addTestimonialVideo = async (title: string, url: string, type?: "audio" | "video" | "link") => {
+    const videoId = `vid-${Date.now()}`;
     try {
-      await setDoc(doc(collection(db, "testimonialVideos"), newVid.id), newVid);
+      if (url.length > 700000) {
+        // Chunk the URL
+        const chunkSize = 600000;
+        const totalChunks = Math.ceil(url.length / chunkSize);
+        
+        // Write chunks FIRST so they exist when the parent doc snapshot fires
+        for (let i = 0; i < totalChunks; i++) {
+          const chunkText = url.substring(i * chunkSize, (i + 1) * chunkSize);
+          await setDoc(doc(db, "testimonialVideos", videoId, "chunks", String(i)), {
+            index: i,
+            text: chunkText
+          });
+        }
+
+        // Write the parent doc LAST
+        const newVid = { id: videoId, title, url: "chunked", isChunked: true, type: type || "link" };
+        await setDoc(doc(collection(db, "testimonialVideos"), videoId), newVid);
+      } else {
+        const newVid = { id: videoId, title, url, type: type || "link" };
+        await setDoc(doc(collection(db, "testimonialVideos"), videoId), newVid);
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `testimonialVideos/${newVid.id}`);
+      handleFirestoreError(err, OperationType.WRITE, `testimonialVideos/${videoId}`);
+      throw err;
     }
   };
 
   const removeTestimonialVideo = async (id: string) => {
     try {
+      // Fetch and delete subcollection chunks if any
+      const chunksSnap = await getDocs(collection(db, "testimonialVideos", id, "chunks"));
+      for (const d of chunksSnap.docs) {
+        await deleteDoc(doc(db, "testimonialVideos", id, "chunks", d.id));
+      }
       await deleteDoc(doc(db, "testimonialVideos", id));
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `testimonialVideos/${id}`);
+      throw err;
     }
   };
 
-  const updateSocialLinks = async (whatsapp: string, youtube: string, instagram: string, facebook: string) => {
+  const updateSocialLinks = async (whatsapp: string, youtube: string, instagram: string, facebook: string, shareTemplateStr: string) => {
     try {
       await setDoc(doc(db, "settings", "global"), { 
         whatsappNumber: whatsapp || null,
         youtubeUrl: youtube || null,
         instagramUrl: instagram || null,
-        facebookUrl: facebook || null
+        facebookUrl: facebook || null,
+        shareTemplate: shareTemplateStr || null
       }, { merge: true });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, "settings/global");
@@ -449,7 +676,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   return (
     <StoreContext.Provider value={{ 
       courses, students, appointments, videos, logoUrl, heroImages, heroOverlayColor, heroOverlayOpacity, gpayQrUrl, testimonialVideos,
-      founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl, facebookUrl,
+      founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl, facebookUrl, shareTemplate,
       muthraIconUrl, acupressureIconUrl, foodIconUrl, webinarVisible,
       appointmentSettings, updateAppointmentSettings,
       addCourse, updateCourse, deleteCourse, 

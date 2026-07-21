@@ -17,6 +17,11 @@ service cloud.firestore {
     match /courses/{courseId} {
       allow read: if true;
       allow write: if isAdmin();
+      
+      match /chunks/{chunkId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
     }
     
     match /students/{studentId} {
@@ -26,11 +31,21 @@ service cloud.firestore {
     match /videos/{videoId} {
       allow read: if true;
       allow write: if isAdmin();
+      
+      match /chunks/{chunkId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
     }
     
     match /testimonialVideos/{videoId} {
       allow read: if true;
       allow write: if isAdmin();
+      
+      match /chunks/{chunkId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
     }
     
     match /settings/{settingId} {

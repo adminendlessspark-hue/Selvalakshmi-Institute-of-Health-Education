@@ -33,7 +33,7 @@ export function Login() {
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (adminPin === "admin1234") { // A simple dummy PIN since we aren't using Firebase Auth for admin
+    if (adminPin === "Admin7522") { // Updated admin login PIN as requested
       loginAdmin();
       navigate("/admin");
     } else {
@@ -104,7 +104,7 @@ export function Login() {
               <input
                 type="password"
                 required
-                placeholder="Enter PIN (try admin1234)"
+                placeholder="Enter PIN (try Admin7522)"
                 className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-sage-500 focus:border-sage-500"
                 value={adminPin}
                 onChange={e => setAdminPin(e.target.value)}

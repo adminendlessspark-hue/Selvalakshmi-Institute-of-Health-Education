@@ -24,8 +24,8 @@ function ProtectedAdmin({ children }: { children: React.ReactNode }) {
 }
 
 function ProtectedStudent({ children }: { children: React.ReactNode }) {
-  const { loggedStudentId } = useStore();
-  return loggedStudentId ? children : <Navigate to="/login" />;
+  const { loggedStudentId, isAdmin } = useStore();
+  return (loggedStudentId || isAdmin) ? children : <Navigate to="/login" />;
 }
 
 export default function App() {

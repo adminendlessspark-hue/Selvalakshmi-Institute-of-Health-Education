@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { QRCodeSVG } from "qrcode.react";
 import { API_BASE } from "../config";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Copy, Check, Share2 } from "lucide-react";
 
 const loadRazorpay = () => {
   return new Promise((resolve) => {
@@ -74,6 +74,7 @@ export function Register() {
   const [useUpiFallback, setUseUpiFallback] = useState(false);
   const [upiRefNo, setUpiRefNo] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
   const t = translations[language];
 
   const [formData, setFormData] = useState({
@@ -463,18 +464,6 @@ export function Register() {
           if (!selectedCourseObj) return null;
           return (
             <div className="bg-white rounded-xl shadow-sm border border-sage-100 overflow-hidden mb-10">
-              {selectedCourseObj.videoUrl ? (
-                 <div className="w-full aspect-video">
-                   <iframe 
-                     src={selectedCourseObj.videoUrl}
-                     className="w-full h-full"
-                     allowFullScreen
-                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                   />
-                 </div>
-              ) : selectedCourseObj.imageUrl && (
-                 <img src={selectedCourseObj.imageUrl} alt={selectedCourseObj.title} className="w-full h-64 object-cover" />
-              )}
               <div className="p-6">
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">{selectedCourseObj.title}</h2>
                 <div className="flex flex-wrap gap-4 text-sm text-sage-700 mb-4 font-medium">
@@ -483,7 +472,153 @@ export function Register() {
                       <span>💰 {selectedCourseObj.fee.toLowerCase() === 'free' || selectedCourseObj.fee.includes('₹') ? selectedCourseObj.fee : `₹${selectedCourseObj.fee}`}</span>
                    )}
                 </div>
-                <p className="text-slate-600 whitespace-pre-wrap">{selectedCourseObj.description}</p>
+
+                {/* Render Media Assets BELOW the course name/title */}
+                {selectedCourseObj.videoUrl ? (
+                  <div className="mb-6 rounded-lg overflow-hidden border border-slate-100 shadow-inner bg-slate-50">
+                    {(() => {
+                      const videoUrl = selectedCourseObj.videoUrl || "";
+                      const isUploaded = videoUrl.startsWith("data:");
+                      const isAudio = videoUrl.toLowerCase().startsWith('data:audio/') || 
+                                      (!isUploaded && (
+                                        videoUrl.toLowerCase().endsWith('.mp3') || 
+                                        videoUrl.toLowerCase().endsWith('.wav') || 
+                                        videoUrl.toLowerCase().endsWith('.m4a') || 
+                                        videoUrl.toLowerCase().endsWith('.ogg') || 
+                                        videoUrl.toLowerCase().endsWith('.aac')
+                                      ));
+
+                      const isUploadedVideo = !isAudio && (
+                        isUploaded ||
+                        videoUrl.toLowerCase().endsWith('.mp4') || 
+                        videoUrl.toLowerCase().endsWith('.webm') || 
+                        videoUrl.toLowerCase().endsWith('.mov') || 
+                        videoUrl.toLowerCase().endsWith('.avi') || 
+                        videoUrl.toLowerCase().endsWith('.mkv')
+                      );
+
+                      if (isAudio) {
+                        return (
+                          <div className="w-full bg-slate-950 p-6 flex flex-col items-center justify-center gap-4 relative">
+                            {selectedCourseObj.imageUrl && (
+                              <img src={selectedCourseObj.imageUrl} alt={selectedCourseObj.title} className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm" />
+                            )}
+                            <div className="relative z-10 w-full flex flex-col items-center gap-2">
+                              <span className="text-white text-xs font-semibold uppercase tracking-wider bg-sage-800 px-3 py-1 rounded">Course Audio Introduction</span>
+                              <audio src={selectedCourseObj.videoUrl} controls className="w-full max-w-md h-10" />
+                            </div>
+                          </div>
+                        );
+                      } else if (isUploadedVideo) {
+                        return (
+                          <div className="w-full aspect-video bg-slate-900">
+                            <video src={selectedCourseObj.videoUrl} controls className="w-full h-full object-contain" />
+                          </div>
+                        );
+                      } else {
+                        let embedUrl = videoUrl;
+                        if (videoUrl.includes("youtube.com/watch?v=")) {
+                          embedUrl = videoUrl.replace("youtube.com/watch?v=", "youtube.com/embed/");
+                        } else if (videoUrl.includes("youtu.be/")) {
+                          embedUrl = videoUrl.replace("youtu.be/", "youtube.com/embed/");
+                        }
+                        return (
+                          <div className="w-full aspect-video">
+                            <iframe 
+                              src={embedUrl}
+                              className="w-full h-full border-0"
+                              allowFullScreen
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            />
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                ) : selectedCourseObj.imageUrl && (
+                  <div className="mb-6 rounded-lg overflow-hidden border border-slate-100 bg-slate-50">
+                    <img src={selectedCourseObj.imageUrl} alt={selectedCourseObj.title} className="w-full max-h-80 object-cover" />
+                  </div>
+                )}
+
+                {/* Hook / Highlight Words */}
+                <div className="mt-4 space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-sage-800">
+                    {language === "en" ? "✨ Course Overview & Highlights" : "✨ வகுப்பு அறிமுகம் & சிறப்பம்சங்கள்"}
+                  </h4>
+                  <p className="text-slate-600 text-sm whitespace-pre-wrap leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-150">
+                    {selectedCourseObj.description}
+                  </p>
+                </div>
+
+                {/* Explicit Shareable / Direct Registration Link (Required) */}
+                {(() => {
+                  const regUrl = `${window.location.origin}${window.location.pathname}#/register?course=${selectedCourseObj.id}`;
+                  return (
+                    <div className="mt-6 p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
+                          <span className="text-base leading-none">📢</span>
+                          <span>{language === "en" ? "Course Registration Link" : "வகுப்பு பதிவு செய்வதற்கான லிங்க்"}</span>
+                        </div>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                          {language === "en" ? "Ready to Share" : "பகிர தயாராக உள்ளது"}
+                        </span>
+                      </div>
+                      
+                      <p className="text-xs text-slate-600">
+                        {language === "en" 
+                          ? "Share this direct registration link with family, friends, or WhatsApp groups!" 
+                          : "இந்த நேரடிப் பதிவு லிங்கை உங்கள் குடும்பத்தினர், நண்பர்கள் மற்றும் வாட்ஸ்அப் குழுக்களில் பகிருங்கள்!"}
+                      </p>
+
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="flex-1 bg-white border border-emerald-200 rounded-lg px-3 py-2 text-xs font-mono text-emerald-950 truncate select-all flex items-center justify-between">
+                          <span className="truncate">{regUrl}</span>
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(regUrl);
+                              setCopiedLink(true);
+                              setTimeout(() => setCopiedLink(false), 2000);
+                            }}
+                            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-2 rounded-lg transition font-bold text-xs"
+                          >
+                            {copiedLink ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                <span className="text-emerald-700">{language === "en" ? "Copied!" : "நகலெடுக்கப்பட்டது!"}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5 text-slate-600" />
+                                <span>{language === "en" ? "Copy Link" : "லிங்க் நகலெடு"}</span>
+                              </>
+                            )}
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const shareMsg = language === "en"
+                                ? `🌟 Join our brand new program: *${selectedCourseObj.title}*! Register here:\n🔗 ${regUrl}`
+                                : `🌟 எங்களது புதிய வகுப்பில் இணையுங்கள்: *${selectedCourseObj.title}*! இப்போதே பதிவு செய்ய:\n🔗 ${regUrl}`;
+                              const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
+                              window.open(whatsappUrl, '_blank');
+                            }}
+                            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg transition font-bold text-xs shadow-sm"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                            <span>{language === "en" ? "Share" : "பகிர்"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
               </div>
             </div>
           );

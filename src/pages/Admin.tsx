@@ -1,7 +1,8 @@
 import React, { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { getOAuthToken } from "../lib/oauth";
-import { Users, BookOpen, Video as VideoIcon, Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Upload, Share2, Copy, ListChecks } from "lucide-react";
+import { Users, BookOpen, Video as VideoIcon, Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Upload, Share2, Copy, ListChecks, Activity, Headphones, Download, ExternalLink } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Course, Student, Video, Quiz } from "../types";
 
@@ -21,6 +22,7 @@ const formatDateString = (dateStr: string) => {
 const convertToEmbedUrl = (input: string | null | undefined): string => {
   if (!input) return "";
   const trimmed = input.trim();
+  if (trimmed.startsWith("data:")) return trimmed;
   
   // 1. Try to extract from iframe src attribute if user pasted an iframe
   const srcMatch = trimmed.match(/src=["']([^"']+)["']/i);
@@ -61,7 +63,7 @@ const convertToEmbedUrl = (input: string | null | undefined): string => {
 export function Admin() {
   const { 
     courses, students, appointments, videos, logoUrl, heroImages, heroOverlayColor, heroOverlayOpacity, gpayQrUrl, testimonialVideos,
-    founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl, facebookUrl,
+    founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl, facebookUrl, shareTemplate,
     muthraIconUrl, acupressureIconUrl, foodIconUrl,
     appointmentSettings, updateAppointmentSettings,
     addCourse, updateCourse, deleteCourse, 
@@ -70,8 +72,9 @@ export function Admin() {
     addVideo, updateVideo, deleteVideo, updateLogo,
     updateFounderVideo, updateAboutVideo, updateSocialLinks,
     addHeroImage, removeHeroImage, updateHeroOverlay, updateGpayQr, addTestimonialVideo, removeTestimonialVideo, updateFeatureIcons,
-    webinarVisible, updateWebinarVisible
+    webinarVisible, updateWebinarVisible, loginStudent
   } = useStore();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"registrations" | "appointments" | "courses" | "videos" | "appearance" | "marketing">("registrations");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -118,13 +121,14 @@ export function Admin() {
 
   // Local state for forms
   const [showCourseForm, setShowCourseForm] = useState(false);
-  const [newCourse, setNewCourse] = useState<Course>({ id: "", title: "", duration: "", description: "", imageUrl: "", videoUrl: "", fee: "", launchDate: "", isWebinar: false, meetLink: "" });
+  const [newCourse, setNewCourse] = useState<Course>({ id: "", title: "", duration: "", description: "", imageUrl: "", videoUrl: "", fee: "", launchDate: "", isWebinar: false, isOffline: false, meetLink: "", trackerPdfUrl: "", dietWorksheetUrl: "" });
 
   const [showVideoForm, setShowVideoForm] = useState(false);
   const [newVideo, setNewVideo] = useState<{ courseId: string; title: string; duration: string; thumbnail: string; url: string; materialUrl?: string }>({ courseId: "", title: "", duration: "", thumbnail: "", url: "", materialUrl: "" });
 
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [editingStudentData, setEditingStudentData] = useState<Student | null>(null);
+  const [viewingTrackerStudentId, setViewingTrackerStudentId] = useState<string | null>(null);
 
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [editingCourseData, setEditingCourseData] = useState<Course | null>(null);
@@ -136,12 +140,25 @@ export function Admin() {
   const [editingQuizData, setEditingQuizData] = useState<Quiz | null>(null);
 
   const [templateLanguage, setTemplateLanguage] = useState<"en" | "ta">("en");
+  const [templateLayout, setTemplateLayout] = useState<"video-top" | "video-bottom">("video-top");
   const [selectedCourseForTemplate, setSelectedCourseForTemplate] = useState<string>("");
   const [shareTemplateText, setShareTemplateText] = useState<string>(`🌟 *Welcome to Our Platform!* 🌟\n\nExplore our latest courses and sign up today!\n\n🔗 *Visit:*\nhttps://selvalakshmihealtheducation.in`);
 
   const [feeInput, setFeeInput] = useState<number | "">(appointmentSettings?.fee ?? 100);
   const [meetLinkInput, setMeetLinkInput] = useState<string>(appointmentSettings?.defaultMeetLink || "");
   const [razorpayKeyIdInput, setRazorpayKeyIdInput] = useState<string>(appointmentSettings?.razorpayKeyId || "");
+
+  const [testimonyTitle, setTestimonyTitle] = useState("");
+  const [testimonyUrl, setTestimonyUrl] = useState("");
+  const [testimonyUploadType, setTestimonyUploadType] = useState<"link" | "audio" | "video">("link");
+  const [isSavingTestimony, setIsSavingTestimony] = useState(false);
+  const [isUploadingAsset, setIsUploadingAsset] = useState(false);
+
+  // States for explicit save options in Course Media Assets Helper
+  const [helperVideoFile, setHelperVideoFile] = useState<File | null>(null);
+  const [helperVideoDataUrl, setHelperVideoDataUrl] = useState<string | null>(null);
+  const [helperPosterFile, setHelperPosterFile] = useState<File | null>(null);
+  const [helperPosterDataUrl, setHelperPosterDataUrl] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (appointmentSettings) {
@@ -159,7 +176,7 @@ export function Admin() {
     
     addCourse({...newCourse, videoUrl: finalUrl});
     setShowCourseForm(false);
-    setNewCourse({ id: "", title: "", duration: "", description: "", imageUrl: "", videoUrl: "", fee: "", launchDate: "", isWebinar: false, meetLink: "" });
+    setNewCourse({ id: "", title: "", duration: "", description: "", imageUrl: "", videoUrl: "", fee: "", launchDate: "", isWebinar: false, isOffline: false, meetLink: "", trackerPdfUrl: "" });
   };
 
   const handleAddVideo = (e: React.FormEvent) => {
@@ -182,11 +199,8 @@ export function Admin() {
       const testimonyUrl = testimonialVideos && testimonialVideos.length > 0 ? convertToWatchUrl(testimonialVideos[0].url) : "";
       const cleanCourseVideoUrl = convertToWatchUrl(course.videoUrl);
 
-      const videoLineEn = cleanCourseVideoUrl ? `\n\n📺 *Course Overview Video:*\n${cleanCourseVideoUrl}` : "";
-      const testimonyLineEn = testimonyUrl ? `\n\n🗣️ *Testimony Video:*\n${testimonyUrl}` : "";
-      
-      const videoLineTa = cleanCourseVideoUrl ? `\n\n📺 *வகுப்பு பற்றிய விளக்கம்:*\n${cleanCourseVideoUrl}` : "";
-      const testimonyLineTa = testimonyUrl ? `\n\n🗣️ *பயிற்சியாளர் கருத்து:*\n${testimonyUrl}` : "";
+      const isVideoUploaded = course.videoUrl && (course.videoUrl.startsWith("data:") || course.videoUrl === "chunked");
+      const isTestimonyUploaded = testimonyUrl && (testimonyUrl.startsWith("data:") || testimonyUrl === "chunked");
 
       const getPublicBaseUrl = () => {
         return "https://selvalakshmihealtheducation.in";
@@ -196,10 +210,134 @@ export function Admin() {
       const cleanBaseUrl = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
       const registerUrl = `${cleanBaseUrl}/#/register?course=${course.id}`;
 
+      const hookText = shareTemplate ? `${shareTemplate}\n\n` : '';
+
       if (templateLanguage === "en") {
-        setShareTemplateText(`🌟 *Join Our New Program: ${course.title}* 🌟\n\nClick the link below to view course details and register:\n\n🔗 *Register Now at:*\n${registerUrl}\n\nDon't miss out on this opportunity!`);
-      } else {
-         setShareTemplateText(`🌟 *எங்கள் புதிய வகுப்பில் இணையுங்கள்: ${course.title}* 🌟\n\nவகுப்பு விவரங்களை அறியவும் பதிவு செய்யவும் கீழே உள்ள லிங்கை அழுத்தவும்:\n\n🔗 *இப்போதே பதிவு செய்யுங்கள்:*\n${registerUrl}\n\nஇந்த வாய்ப்பை தவறவிடாதீர்கள்!`);
+        const testimonyLineEn = isTestimonyUploaded
+          ? `\n\n🗣️ *Testimony Video:* Playable on our homepage!`
+          : (testimonyUrl ? `\n🗣️ *Testimony Video:*\n${testimonyUrl}` : "");
+
+        const videoLineEn = (isVideoUploaded || templateLayout === "video-top")
+          ? `\n📺 *Course Video/Audio:* Playable directly on the registration link!`
+          : (cleanCourseVideoUrl ? `\n📺 *Course Promotion Video:*\n${cleanCourseVideoUrl}` : "");
+
+        let posterLineEn = "";
+        if (course.imageUrl) {
+          if (course.imageUrl.startsWith("http")) {
+            posterLineEn = `\n🖼️ *Course Poster:*\n${course.imageUrl}`;
+          } else {
+            posterLineEn = `\n🖼️ *[Attach the Course Poster Image]*`;
+          }
+        }
+
+        const phoneNo = whatsappNumber ? whatsappNumber : "+91 90428 21999";
+
+        const bodyContentEn = `Hello! 👋
+
+Welcome to *Selvalakshmi Health Education*!
+We are excited to share an amazing opportunity to transform your life and health! 🚀
+
+${hookText ? `${hookText}\n` : ""}📍 *Modes of Study Available:*
+📍 *Offline Classes:* Practical, hands-on physical labs and classroom training.
+💻 *Online Classes:* Learn from anywhere with our advanced interactive student app.
+
+🌟 *Explore our industry-leading program:*
+🎓 *Course Name:* ${course.title}
+⏱️ *Duration:* ${course.duration}
+💰 *Course Fee:* ${course.fee ? (course.fee.toLowerCase() === 'free' || course.fee.includes('₹') ? course.fee : `₹${course.fee}`) : "Free"}
+
+✨ *Join us to get:*
+✅ Flexible Class Schedules
+✅ 100% Practical & Natural Therapies
+✅ Industry Expert Mentorship & Diet Support
+
+Ready to get started or learn more?
+👉 *Fill out this quick inquiry form and we'll get right back to you:*
+${registerUrl}
+${videoLineEn}${testimonyLineEn}${posterLineEn}
+
+📞 *Or reach us directly on Call / WhatsApp:* ${phoneNo}
+
+Let's build a healthier future together! ⭐️
+
+🔗 *For Admission:* ${registerUrl}`;
+
+        if (templateLayout === "video-top") {
+          const topVideoUrl = (cleanCourseVideoUrl && !isVideoUploaded) 
+            ? cleanCourseVideoUrl 
+            : ((testimonyUrl && !isTestimonyUploaded) ? testimonyUrl : "");
+
+          if (topVideoUrl) {
+            setShareTemplateText(`${topVideoUrl}\n\n${bodyContentEn}`);
+          } else {
+            setShareTemplateText(bodyContentEn);
+          }
+        } else {
+          setShareTemplateText(bodyContentEn);
+        }
+      } else { 
+        const testimonyLineTa = isTestimonyUploaded
+          ? `\n🗣️ *பயிற்சியாளர் கருத்து:* எங்கள் முகப்புப் பக்கத்தில் கேட்கலாம்!`
+          : (testimonyUrl ? `\n🗣️ *பயிற்சியாளர் கருத்து:*\n${testimonyUrl}` : "");
+
+        const videoLineTa = (isVideoUploaded || templateLayout === "video-top")
+          ? `\n📺 *வகுப்பு வீடியோ/ஆடியோ:* பதிவு செய்யும் பக்கத்தில் நேரடியாகக் கேட்கலாம்!`
+          : (cleanCourseVideoUrl ? `\n📺 *வகுப்பு விளம்பர வீடியோ:*\n${cleanCourseVideoUrl}` : "");
+
+        let posterLineTa = "";
+        if (course.imageUrl) {
+          if (course.imageUrl.startsWith("http")) {
+            posterLineTa = `\n🖼️ *வகுப்பு போஸ்டர்:*\n${course.imageUrl}`;
+          } else {
+            posterLineTa = `\n🖼️ *[வகுப்பு போஸ்டர் படத்தை இத்துடன் இணைக்கவும்]*`;
+          }
+        }
+
+        const phoneNo = whatsappNumber ? whatsappNumber : "+91 90428 21999";
+
+        const bodyContentTa = `வணக்கம்! 👋
+
+*செல்வலட்சுமி ஹெல்த் எஜுகேஷன்* உங்களை அன்போடு வரவேற்கிறது!
+உங்கள் ஆரோக்கியத்தையும் வாழ்க்கை முறையையும் மாற்றுவதற்கான ஒரு அருமையான வாய்ப்பைப் பகிர்ந்து கொள்வதில் நாங்கள் மகிழ்ச்சியடைகிறோம்! 🚀
+
+${hookText ? `${hookText}\n` : ""}📍 *வகுப்புகள் நடைபெறும் முறைகள்:*
+📍 *நேரடி வகுப்புகள் (Offline):* நேரடி பயிற்சி மற்றும் செயல்முறை விளக்கங்கள்.
+💻 *ஆன்லைன் வகுப்புகள் (Online):* எங்கள் மேம்பட்ட செயலி மூலம் எந்த இடத்திலிருந்தும் கற்கலாம்.
+
+🌟 *எங்கள் புதிய வகுப்பில் இணையுங்கள்:*
+🎓 *வகுப்பு பெயர்:* ${course.title}
+⏱️ *கால அளவு:* ${course.duration}
+💰 *கட்டணம்:* ${course.fee ? (course.fee.toLowerCase() === 'free' || course.fee.includes('₹') ? course.fee : `₹${course.fee}`) : "இலவசம்"}
+
+✨ *எங்களோடு இணைவதன் நன்மைகள்:*
+✅ நெகிழ்வான வகுப்பு நேரங்கள் (Flexible Schedules)
+✅ 100% இயற்கை மற்றும் சுய-குணப்படுத்தும் பயிற்சிகள்
+✅ சிறந்த நிபுணர்களின் வழிகாட்டுதல் & உணவு ஆலோசனை
+
+வகுப்பில் சேர அல்லது மேலும் விவரங்கள் அறிய:
+👉 *இந்த எளிய விண்ணப்பப் படிவத்தைப் பூர்த்தி செய்யவும்:*
+${registerUrl}
+${videoLineTa}${testimonyLineTa}${posterLineTa}
+
+📞 *நேரடித் தொடர்புக்கு (அழைப்பு / வாட்ஸ்அப்):* ${phoneNo}
+
+ஆரோக்கியமான எதிர்காலத்தை ஒன்றிணைந்து உருவாக்குவோம்! ⭐️
+
+🔗 *இப்போதே பதிவு செய்ய:* ${registerUrl}`;
+
+        if (templateLayout === "video-top") {
+          const topVideoUrl = (cleanCourseVideoUrl && !isVideoUploaded) 
+            ? cleanCourseVideoUrl 
+            : ((testimonyUrl && !isTestimonyUploaded) ? testimonyUrl : "");
+
+          if (topVideoUrl) {
+            setShareTemplateText(`${topVideoUrl}\n\n${bodyContentTa}`);
+          } else {
+            setShareTemplateText(bodyContentTa);
+          }
+        } else {
+          setShareTemplateText(bodyContentTa);
+        }
       }
     } else {
       const getPublicBaseUrl = () => {
@@ -209,13 +347,15 @@ export function Admin() {
       const publicBaseUrl = getPublicBaseUrl();
       const cleanBaseUrl = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
 
+      const hookText = shareTemplate ? `${shareTemplate}\n\n` : '';
+
       if (templateLanguage === "en") {
-        setShareTemplateText(`🌟 *Welcome to Our Platform!* 🌟\n\nExplore our latest courses and sign up today!\n\n🔗 *Visit:*\n${cleanBaseUrl}`);
+        setShareTemplateText(`${hookText}🌟 *Welcome to Our Platform!* 🌟\n\nExplore our latest courses and sign up today!\n\n🔗 *Visit:*\n${cleanBaseUrl}`);
       } else {
-        setShareTemplateText(`🌟 *எங்கள் தளத்திற்கு வருக!* 🌟\n\nஎங்கள் புதிய வகுப்புகளைத் தேர்ந்தெடுத்து இன்றே இணையுங்கள்!\n\n🔗 *தொடர்புக்கு:*\n${cleanBaseUrl}`);
+        setShareTemplateText(`${hookText}🌟 *எங்கள் தளத்திற்கு வருக!* 🌟\n\nஎங்கள் புதிய வகுப்புகளைத் தேர்ந்தெடுத்து இன்றே இணையுங்கள்!\n\n🔗 *தொடர்புக்கு:*\n${cleanBaseUrl}`);
       }
     }
-  }, [selectedCourseForTemplate, templateLanguage, courses, testimonialVideos]);
+  }, [selectedCourseForTemplate, templateLanguage, templateLayout, courses, testimonialVideos, shareTemplate]);
 
   const resizeImage = (file: File, maxWidth: number, maxHeight: number, callback: (dataUrl: string) => void) => {
     const reader = new FileReader();
@@ -254,6 +394,41 @@ export function Admin() {
     reader.readAsDataURL(file);
   };
 
+  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 800000) {
+        alert("File is too large. Please upload a PDF under 800KB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          callback(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // With chunked Firestore uploading, we can easily support files up to 15MB.
+      if (file.size > 15000000) {
+        alert("Uploaded promotional/audio files must be under 15MB.\n\nTips:\n- Compress your video/audio file using a free online compressor.\n- Or, upload the video to YouTube (highly recommended) and simply paste the YouTube watch/embed link!");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          callback(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -278,6 +453,26 @@ export function Admin() {
       resizeImage(file, 600, 600, (resizedDataUrl) => {
         updateGpayQr(resizedDataUrl);
       });
+    }
+  };
+
+  const handleTestimonialFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: "audio" | "video") => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2200000) {
+        alert(`The selected file is too large (${(file.size / 1024 / 1024).toFixed(2)}MB).\n\nDue to database storage limitations, direct file uploads must be under 2MB to prevent save errors.\n\nTips:\n- For audio: Use a compressed format (such as a lower-bitrate MP3 or AAC) or a shorter recording.\n- For video: We highly recommend uploading your video to YouTube and pasting the link, or compressing your video to a small size!`);
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setTestimonyUrl(event.target.result as string);
+          setTestimonyUploadType(type);
+          alert(`${type === "audio" ? "Audio" : "Video"} file loaded successfully! Click the "Save Testimonial" button below to store it.`);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -447,6 +642,27 @@ export function Admin() {
                                     {student.paymentReference}
                                   </div>
                                 )}
+                                {course?.isOffline && (
+                                  <div className="mt-2">
+                                    {student.bloodReportUrl ? (
+                                      <a 
+                                        href={student.bloodReportUrl} 
+                                        download={`Blood_Report_${student.firstName}_${student.lastName}.pdf`}
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded font-semibold border border-red-200"
+                                        title="View/Download Blood Report"
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block shrink-0" />
+                                        🩸 Blood Report
+                                      </a>
+                                    ) : (
+                                      <span className="text-[11px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-100 font-medium inline-block">
+                                        ⚠️ Report Missing
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </td>
                               <td className="p-4">{course ? course.title : student.courseId}</td>
                               <td className="p-4 text-slate-500 whitespace-nowrap">{new Date(student.registrationDate).toLocaleDateString()}</td>
@@ -467,6 +683,7 @@ export function Admin() {
                                     <button title="Reject" onClick={() => updateStudent({...student, status: "rejected"})} className="p-1 text-red-600 hover:bg-red-50 rounded"><X className="w-4 h-4"/></button>
                                   </>
                                 )}
+                                <button title="View Tracker" onClick={() => setViewingTrackerStudentId(student.id)} className="p-1 text-sage-600 hover:bg-sage-50 rounded"><Activity className="w-4 h-4"/></button>
                                 <button onClick={() => { setEditingStudentId(student.id); setEditingStudentData(student); }} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Edit2 className="w-4 h-4"/></button>
                                 <button onClick={() => { if(window.confirm('Delete this registration?')) deleteStudent(student.id); }} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button>
                               </td>
@@ -696,28 +913,75 @@ export function Admin() {
                         <label className="block text-sm font-medium text-slate-700 mb-1">Course Fee</label>
                         <input type="text" placeholder="e.g. ₹3000 or Free" className="w-full px-3 py-2 border rounded-md" value={newCourse.fee || ''} onChange={e => setNewCourse({...newCourse, fee: e.target.value})} />
                       </div>
+                      {!newCourse.isOffline && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Launch Date</label>
+                          <input type="date" className="w-full px-3 py-2 border rounded-md" value={newCourse.launchDate || ''} onChange={e => setNewCourse({...newCourse, launchDate: e.target.value})} />
+                        </div>
+                      )}
+                      {newCourse.isOffline && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Image URL or Upload Thumbnail</label>
+                          <div className="flex gap-2">
+                            <input type="url" className="flex-1 px-3 py-2 border rounded-md" value={newCourse.imageUrl || ''} onChange={e => setNewCourse({...newCourse, imageUrl: e.target.value})} placeholder="Image URL" />
+                            <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-2 rounded-md flex items-center justify-center">
+                              <Upload className="w-4 h-4 mr-1" />
+                              <span className="text-sm">Upload</span>
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  resizeImage(file, 800, 600, (url) => setNewCourse({...newCourse, imageUrl: url}));
+                                }
+                              }} />
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                      {!newCourse.isOffline && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Image URL (Optional)</label>
+                          <input type="url" className="w-full px-3 py-2 border rounded-md" value={newCourse.imageUrl || ''} onChange={e => setNewCourse({...newCourse, imageUrl: e.target.value})} />
+                        </div>
+                      )}
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Launch Date</label>
-                        <input type="date" className="w-full px-3 py-2 border rounded-md" value={newCourse.launchDate || ''} onChange={e => setNewCourse({...newCourse, launchDate: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Image URL (Optional)</label>
-                        <input type="url" className="w-full px-3 py-2 border rounded-md" value={newCourse.imageUrl || ''} onChange={e => setNewCourse({...newCourse, imageUrl: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Video URL (Optional YouTube link)</label>
-                        <input type="url" className="w-full px-3 py-2 border rounded-md" value={newCourse.videoUrl || ''} onChange={e => setNewCourse({...newCourse, videoUrl: e.target.value})} />
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Course Promotion Video (YouTube Link or Upload Video File)</label>
+                        <div className="flex gap-2">
+                          <input type="url" className="flex-1 px-3 py-2 border rounded-md text-sm" value={newCourse.videoUrl || ''} onChange={e => setNewCourse({...newCourse, videoUrl: e.target.value})} placeholder="YouTube Link or pasted base64 video" />
+                          <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-2 rounded-md flex items-center justify-center shrink-0">
+                            <Upload className="w-4 h-4 mr-1" />
+                            <span className="text-sm">Upload</span>
+                            <input type="file" accept="video/*,audio/*" className="hidden" onChange={(e) => handleVideoUpload(e, (url) => setNewCourse({...newCourse, videoUrl: url}))} />
+                          </label>
+                        </div>
+                        <span className="text-[10px] text-slate-500 mt-1 block">Recommended: Upload to YouTube and paste link, or upload a direct video/audio file under 2MB.</span>
                       </div>
                       <div className="flex flex-col justify-center gap-2">
                         <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                           <input type="checkbox" className="rounded" checked={newCourse.isWebinar || false} onChange={e => setNewCourse({...newCourse, isWebinar: e.target.checked})} />
                           This is a Live Webinar
                         </label>
+                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                          <input type="checkbox" className="rounded" checked={newCourse.isOffline || false} onChange={e => setNewCourse({...newCourse, isOffline: e.target.checked})} />
+                          This is an Offline Course
+                        </label>
                       </div>
                       {newCourse.isWebinar && (
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">Google Meet Link</label>
                           <input type="url" placeholder="https://meet.google.com/..." className="w-full px-3 py-2 border rounded-md" value={newCourse.meetLink || ''} onChange={e => setNewCourse({...newCourse, meetLink: e.target.value})} />
+                        </div>
+                      )}
+                      {newCourse.isOffline && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Diet Worksheet PDF URL or Upload</label>
+                          <div className="flex gap-2">
+                            <input type="url" placeholder="Link to diet worksheet PDF" className="w-full px-3 py-2 border rounded-md" value={newCourse.dietWorksheetUrl || ''} onChange={e => setNewCourse({...newCourse, dietWorksheetUrl: e.target.value})} />
+                            <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-2 rounded-md flex items-center justify-center shrink-0">
+                              <Upload className="w-4 h-4 mr-1" />
+                              <span className="text-sm">Upload</span>
+                              <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handlePdfUpload(e, (url) => setNewCourse({...newCourse, dietWorksheetUrl: url}))} />
+                            </label>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -741,19 +1005,62 @@ export function Admin() {
                         <div key={course.id} className="bg-sage-50 p-5 rounded-xl border border-sage-200 flex flex-col space-y-3">
                           <input type="text" className="w-full px-2 py-1 border rounded" value={editingCourseData.title} onChange={(e) => setEditingCourseData({...editingCourseData, title: e.target.value})} placeholder="Title" />
                           <div className="flex gap-2">
-                            <input type="text" className="w-1/3 px-2 py-1 border rounded" value={editingCourseData.duration} onChange={(e) => setEditingCourseData({...editingCourseData, duration: e.target.value})} placeholder="Duration" />
-                            <input type="text" className="w-1/3 px-2 py-1 border rounded" value={editingCourseData.fee || ''} onChange={(e) => setEditingCourseData({...editingCourseData, fee: e.target.value})} placeholder="Fee (e.g. Free or ₹3000)" />
-                            <input type="date" className="w-1/3 px-2 py-1 border rounded" value={editingCourseData.launchDate || ''} onChange={(e) => setEditingCourseData({...editingCourseData, launchDate: e.target.value})} placeholder="Launch Date" />
+                            <input type="text" className="flex-1 px-2 py-1 border rounded" value={editingCourseData.duration} onChange={(e) => setEditingCourseData({...editingCourseData, duration: e.target.value})} placeholder="Duration" />
+                            <input type="text" className="flex-1 px-2 py-1 border rounded" value={editingCourseData.fee || ''} onChange={(e) => setEditingCourseData({...editingCourseData, fee: e.target.value})} placeholder="Fee (e.g. Free or ₹3000)" />
+                            {!editingCourseData.isOffline && (
+                              <input type="date" className="flex-1 px-2 py-1 border rounded" value={editingCourseData.launchDate || ''} onChange={(e) => setEditingCourseData({...editingCourseData, launchDate: e.target.value})} placeholder="Launch Date" />
+                            )}
                           </div>
                           <textarea rows={2} className="w-full px-2 py-1 border rounded flex-1" value={editingCourseData.description} onChange={(e) => setEditingCourseData({...editingCourseData, description: e.target.value})} placeholder="Description" />
-                          <input type="url" className="w-full px-2 py-1 border rounded" value={editingCourseData.imageUrl || ''} onChange={(e) => setEditingCourseData({...editingCourseData, imageUrl: e.target.value})} placeholder="Image URL" />
-                          <input type="url" className="w-full px-2 py-1 border rounded" value={editingCourseData.videoUrl || ''} onChange={(e) => setEditingCourseData({...editingCourseData, videoUrl: e.target.value})} placeholder="Video URL" />
+                          {editingCourseData.isOffline ? (
+                            <div className="flex gap-2">
+                              <input type="url" className="flex-1 px-2 py-1 border rounded" value={editingCourseData.imageUrl || ''} onChange={(e) => setEditingCourseData({...editingCourseData, imageUrl: e.target.value})} placeholder="Image URL" />
+                              <label className="cursor-pointer bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 px-2 py-1 rounded flex items-center justify-center">
+                                <Upload className="w-3 h-3 mr-1" />
+                                <span className="text-xs">Upload</span>
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    resizeImage(file, 800, 600, (url) => setEditingCourseData({...editingCourseData, imageUrl: url}));
+                                  }
+                                }} />
+                              </label>
+                            </div>
+                          ) : (
+                            <input type="url" className="w-full px-2 py-1 border rounded" value={editingCourseData.imageUrl || ''} onChange={(e) => setEditingCourseData({...editingCourseData, imageUrl: e.target.value})} placeholder="Image URL" />
+                          )}
+                          <div className="flex gap-2">
+                            <input type="url" className="flex-1 px-2 py-1 border rounded" value={editingCourseData.videoUrl || ''} onChange={(e) => setEditingCourseData({...editingCourseData, videoUrl: e.target.value})} placeholder="Course Promotion Video URL" />
+                            <label className="cursor-pointer bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 px-2 py-1 rounded flex items-center justify-center shrink-0">
+                              <Upload className="w-3 h-3 mr-1" />
+                              <span className="text-xs">Upload Video/Audio</span>
+                              <input type="file" accept="video/*,audio/*" className="hidden" onChange={(e) => handleVideoUpload(e, (url) => setEditingCourseData({...editingCourseData, videoUrl: url}))} />
+                            </label>
+                          </div>
+                          <span className="text-[10px] text-slate-500 block">Recommended: YouTube link or direct video/audio file under 2MB.</span>
                           <label className="flex items-center gap-2 text-sm">
                             <input type="checkbox" checked={editingCourseData.isWebinar || false} onChange={e => setEditingCourseData({...editingCourseData, isWebinar: e.target.checked})} />
                             Webinar Program
                           </label>
+                          <label className="flex items-center gap-2 text-sm">
+                            <input type="checkbox" checked={editingCourseData.isOffline || false} onChange={e => setEditingCourseData({...editingCourseData, isOffline: e.target.checked})} />
+                            Offline Course
+                          </label>
                           {editingCourseData.isWebinar && (
                              <input type="url" className="w-full px-2 py-1 border rounded" value={editingCourseData.meetLink || ''} onChange={(e) => setEditingCourseData({...editingCourseData, meetLink: e.target.value})} placeholder="Google Meet Link" />
+                          )}
+                          {editingCourseData.isOffline && (
+                             <div className="space-y-2">
+
+                               <div className="flex gap-2">
+                                 <input type="url" className="flex-1 px-2 py-1 border rounded" value={editingCourseData.dietWorksheetUrl || ''} onChange={(e) => setEditingCourseData({...editingCourseData, dietWorksheetUrl: e.target.value})} placeholder="Diet Worksheet PDF URL" />
+                                 <label className="cursor-pointer bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 px-2 py-1 rounded flex items-center justify-center">
+                                   <Upload className="w-3 h-3 mr-1" />
+                                   <span className="text-xs">Upload Diet</span>
+                                   <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handlePdfUpload(e, (url) => setEditingCourseData({...editingCourseData, dietWorksheetUrl: url}))} />
+                                 </label>
+                               </div>
+                             </div>
                           )}
                           
                           <div className="flex justify-end gap-2 mt-2">
@@ -776,10 +1083,22 @@ export function Admin() {
                         </div>
                         <h3 className="font-bold text-slate-900 pr-16">{course.title}</h3>
                         <p className="text-sm text-sage-600 mb-2">
-                          {course.duration} {course.fee && `• ${(course.fee.toLowerCase() === 'free' || course.fee.includes('₹')) ? course.fee : `₹${course.fee}`}`} {course.launchDate && `• 🚀 ${formatDateString(course.launchDate)}`}
+                          {course.duration} {course.fee && `• ${(course.fee.toLowerCase() === 'free' || course.fee.includes('₹')) ? course.fee : `₹${course.fee}`}`} {!course.isOffline && course.launchDate && `• 🚀 ${formatDateString(course.launchDate)}`}
                         </p>
                         <p className="text-sm text-slate-600 line-clamp-2 mb-4 flex-1">{course.description}</p>
-                        <div className="text-xs text-slate-400 font-mono mt-auto">ID: {course.id}</div>
+                        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap justify-between items-center gap-2">
+                          <button
+                            onClick={() => {
+                              loginStudent(`MOCK-STUDENT-${course.id}`);
+                              navigate("/dashboard");
+                            }}
+                            className="bg-sage-50 text-sage-700 hover:bg-sage-100 border border-sage-200 text-xs px-3 py-1.5 rounded-md font-medium transition inline-flex items-center gap-1.5"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                            View Student Portal
+                          </button>
+                          <div className="text-xs text-slate-400 font-mono">ID: {course.id}</div>
+                        </div>
                       </div>
                     )
                   })}
@@ -822,12 +1141,36 @@ export function Admin() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">YouTube Video URL (Optional)</label>
-                        <input type="text" className="w-full px-3 py-2 border rounded-md" value={newVideo.url || ''} onChange={e => setNewVideo({...newVideo, url: e.target.value})} placeholder="https://youtube.com/shorts/..." />
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Video Link (YouTube/pasted URL) or Upload Video/Audio File</label>
+                        <div className="flex gap-2">
+                          <input type="text" className="flex-1 px-3 py-2 border rounded-md text-sm" value={(newVideo.url && newVideo.url.startsWith("data:")) ? "Uploaded Direct Video/Audio File" : (newVideo.url || '')} onChange={e => setNewVideo({...newVideo, url: e.target.value})} placeholder="https://youtube.com/shorts/..." />
+                          <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-2 rounded-md flex items-center justify-center shrink-0">
+                            <Upload className="w-4 h-4 mr-1" />
+                            <span className="text-sm">Upload File</span>
+                            <input type="file" accept="video/*,audio/*" className="hidden" onChange={(e) => handleVideoUpload(e, (url) => {
+                              const defaultThumb = "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=400&auto=format&fit=crop&q=60";
+                              setNewVideo({...newVideo, url: url, thumbnail: newVideo.thumbnail || defaultThumb});
+                            })} />
+                          </label>
+                        </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Thumbnail URL</label>
-                        <input required type="url" className="w-full px-3 py-2 border rounded-md" value={newVideo.thumbnail} onChange={e => setNewVideo({...newVideo, thumbnail: e.target.value})} />
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Thumbnail (Image URL or Upload Image)</label>
+                        <div className="flex gap-2">
+                          <input required type="url" className="flex-1 px-3 py-2 border rounded-md text-sm" value={newVideo.thumbnail || ''} onChange={e => setNewVideo({...newVideo, thumbnail: e.target.value})} placeholder="https://..." />
+                          <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-2 rounded-md flex items-center justify-center shrink-0">
+                            <Upload className="w-4 h-4 mr-1" />
+                            <span className="text-sm">Upload Poster</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                resizeImage(file, 400, 300, (url) => {
+                                  setNewVideo({...newVideo, thumbnail: url});
+                                });
+                              }
+                            }} />
+                          </label>
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Material URL (Worksheet/Notes)</label>
@@ -857,11 +1200,39 @@ export function Admin() {
                           if (isEditing && editingVideoData) {
                             return (
                               <div key={video.id} className="relative rounded-lg overflow-hidden border bg-sage-50 p-3 space-y-2 flex flex-col">
-                                <input type="text" className="w-full px-2 py-1 border rounded text-sm" value={editingVideoData.title} onChange={(e) => setEditingVideoData({...editingVideoData, title: e.target.value})} placeholder="Title" />
-                                <input type="text" className="w-full px-2 py-1 border rounded text-sm" value={editingVideoData.duration} onChange={(e) => setEditingVideoData({...editingVideoData, duration: e.target.value})} placeholder="Duration" />
-                                <input type="text" className="w-full px-2 py-1 border rounded text-sm" value={editingVideoData.url || ''} onChange={(e) => setEditingVideoData({...editingVideoData, url: e.target.value})} placeholder="Video URL" />
-                                <input type="url" className="w-full px-2 py-1 border rounded text-sm" value={editingVideoData.thumbnail} onChange={(e) => setEditingVideoData({...editingVideoData, thumbnail: e.target.value})} placeholder="Thumbnail URL" />
-                                <input type="url" className="w-full px-2 py-1 border rounded text-sm" value={editingVideoData.materialUrl || ''} onChange={(e) => setEditingVideoData({...editingVideoData, materialUrl: e.target.value})} placeholder="Material (Worksheet) URL" />
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">Title</label>
+                                <input type="text" className="w-full px-2 py-1 border rounded text-sm bg-white" value={editingVideoData.title} onChange={(e) => setEditingVideoData({...editingVideoData, title: e.target.value})} placeholder="Title" />
+                                
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">Duration</label>
+                                <input type="text" className="w-full px-2 py-1 border rounded text-sm bg-white" value={editingVideoData.duration} onChange={(e) => setEditingVideoData({...editingVideoData, duration: e.target.value})} placeholder="Duration" />
+                                
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">Video (YouTube URL or Upload File)</label>
+                                <div className="flex gap-1.5">
+                                  <input type="text" className="flex-1 px-2 py-1 border rounded text-xs bg-white" value={(editingVideoData.url && editingVideoData.url.startsWith("data:")) ? "Uploaded File" : (editingVideoData.url || '')} onChange={(e) => setEditingVideoData({...editingVideoData, url: e.target.value})} placeholder="Video URL" />
+                                  <label className="cursor-pointer bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 px-1.5 py-1 rounded flex items-center justify-center shrink-0">
+                                    <Upload className="w-3 h-3" />
+                                    <input type="file" accept="video/*,audio/*" className="hidden" onChange={(e) => handleVideoUpload(e, (url) => setEditingVideoData({...editingVideoData, url: url}))} />
+                                  </label>
+                                </div>
+                                
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">Thumbnail (URL or Upload Image)</label>
+                                <div className="flex gap-1.5">
+                                  <input type="url" className="flex-1 px-2 py-1 border rounded text-xs bg-white" value={editingVideoData.thumbnail} onChange={(e) => setEditingVideoData({...editingVideoData, thumbnail: e.target.value})} placeholder="Thumbnail URL" />
+                                  <label className="cursor-pointer bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 px-1.5 py-1 rounded flex items-center justify-center shrink-0">
+                                    <Upload className="w-3 h-3" />
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        resizeImage(file, 400, 300, (url) => {
+                                          setEditingVideoData({...editingVideoData, thumbnail: url});
+                                        });
+                                      }
+                                    }} />
+                                  </label>
+                                </div>
+                                
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">Material URL</label>
+                                <input type="url" className="w-full px-2 py-1 border rounded text-sm bg-white" value={editingVideoData.materialUrl || ''} onChange={(e) => setEditingVideoData({...editingVideoData, materialUrl: e.target.value})} placeholder="Material (Worksheet) URL" />
                                 
                                 <div className="flex justify-end gap-2 mt-auto pt-2">
                                    <button onClick={() => setEditingVideoId(null)} className="px-2 py-1 text-slate-600 bg-white border rounded text-xs">Cancel</button>
@@ -1128,66 +1499,226 @@ export function Admin() {
                 </div>
 
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-sage-100 max-w-2xl mt-6">
-                  <h3 className="font-bold text-slate-900 mb-4 border-b pb-2">Testimonial Videos</h3>
+                  <h3 className="font-bold text-slate-900 mb-4 border-b pb-2">Student Testimonials (Videos & Audios)</h3>
                   <div className="space-y-6">
-                    <p className="text-sm text-slate-600">Add YouTube video URLs (or any embeddable video links) and a title to display them dynamically on the home page.</p>
-                    <div className="flex flex-col gap-3">
-                       <input 
-                         type="text"
-                         id="testimonialTitleInput"
-                         className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-sage-500 outline-none text-sm"
-                         placeholder="Enter Video Title (e.g. 'Student Success Story')"
-                       />
-                       <div className="flex gap-2">
-                         <input 
-                           type="text"
-                           id="testimonialVideoInput" 
-                           className="flex-1 px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-sage-500 outline-none text-sm"
-                           placeholder="https://www.youtube.com/embed/..."
-                         />
-                         <button
-                           type="button"
-                           onClick={() => {
-                             const titleInput = document.getElementById('testimonialTitleInput') as HTMLInputElement;
-                             const urlInput = document.getElementById('testimonialVideoInput') as HTMLInputElement;
-                             if (titleInput && urlInput && titleInput.value.trim() && urlInput.value.trim()) {
-                               const finalUrl = convertToEmbedUrl(urlInput.value.trim());
-                                addTestimonialVideo(titleInput.value.trim(), finalUrl);
-                               titleInput.value = '';
-                               urlInput.value = '';
-                             } else {
-                               alert("Please provide both Title and Video URL.");
-                             }
-                           }}
-                           className="bg-sage-600 text-white px-4 py-2 rounded-md hover:bg-sage-700 transition shadow-sm text-sm"
-                         >
-                           Add Video
-                         </button>
-                       </div>
+                    <p className="text-sm text-slate-600">
+                      Add student feedback. You can paste a YouTube video link, an audio URL, or upload audio/video files (limited to 2MB). For high-quality media, uploading to YouTube is highly recommended.
+                    </p>
+
+                    {/* Testimony Firestore Quota Warning */}
+                    <div className="bg-amber-50 border border-amber-200/80 rounded-lg p-3.5 text-xs text-amber-900 space-y-2">
+                      <div className="flex items-center gap-2 font-bold text-amber-950 text-[13px]">
+                        <span className="text-base leading-none">⚠️</span>
+                        <span>Important: Prevent Database Rate Exceeded / Quota Errors</span>
+                      </div>
+                      <p className="opacity-95 leading-relaxed">
+                        Uploading direct video or audio files uses heavy database writes. Since you are on the <strong>Firebase Spark (Free) Plan</strong>, this will cause <strong>"Rate Exceeded"</strong> or <strong>"Quota Exceeded"</strong> errors very quickly.
+                      </p>
+                      <p className="text-emerald-800 font-bold">
+                        💡 Best Practice: Select "Web Link" and paste a YouTube video/audio link instead! This is 100% free, loads instantly, and has zero quota limits!
+                      </p>
+                    </div>
+                    
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">New Testimonial Form</h4>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1">STUDENT NAME / TITLE</label>
+                          <input 
+                            type="text"
+                            value={testimonyTitle}
+                            onChange={(e) => setTestimonyTitle(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-sage-500 outline-none text-sm bg-white text-slate-800"
+                            placeholder="e.g. 'Karthik - Asthma Recovery'"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1.5">SOURCE TYPE</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTestimonyUploadType("link");
+                                setTestimonyUrl("");
+                              }}
+                              className={cn(
+                                "py-1.5 px-3 rounded text-xs font-semibold border transition text-center cursor-pointer",
+                                testimonyUploadType === "link"
+                                  ? "bg-sage-600 text-white border-sage-600 shadow-sm"
+                                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                              )}
+                            >
+                              Web Link
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTestimonyUploadType("audio");
+                                setTestimonyUrl("");
+                              }}
+                              className={cn(
+                                "py-1.5 px-3 rounded text-xs font-semibold border transition text-center cursor-pointer",
+                                testimonyUploadType === "audio"
+                                  ? "bg-sage-600 text-white border-sage-600 shadow-sm"
+                                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                              )}
+                            >
+                              Upload Audio
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTestimonyUploadType("video");
+                                setTestimonyUrl("");
+                              }}
+                              className={cn(
+                                "py-1.5 px-3 rounded text-xs font-semibold border transition text-center cursor-pointer",
+                                testimonyUploadType === "video"
+                                  ? "bg-sage-600 text-white border-sage-600 shadow-sm"
+                                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                              )}
+                            >
+                              Upload Video
+                            </button>
+                          </div>
+                        </div>
+
+                        {testimonyUploadType === "link" ? (
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">YOUTUBE OR AUDIO LINK</label>
+                            <input 
+                              type="url"
+                              value={testimonyUrl}
+                              onChange={(e) => setTestimonyUrl(e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-sage-500 outline-none text-sm bg-white text-slate-800"
+                              placeholder="Paste YouTube watch/embed link, or direct audio link"
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">CHOOSE FILE (Max 2MB)</label>
+                            <div className="flex items-center gap-3">
+                              <label className="cursor-pointer bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 px-4 py-2 rounded-md flex items-center justify-center gap-1.5 transition text-sm font-semibold shadow-sm">
+                                <Upload className="w-4 h-4 text-slate-500" />
+                                <span>Choose {testimonyUploadType === "audio" ? "Audio" : "Video"}</span>
+                                <input 
+                                  type="file" 
+                                  accept={testimonyUploadType === "audio" ? "audio/*" : "video/*"}
+                                  className="hidden" 
+                                  onChange={(e) => handleTestimonialFileUpload(e, testimonyUploadType as "audio" | "video")} 
+                                />
+                              </label>
+                              <div className="text-xs text-slate-500 truncate flex-1">
+                                {testimonyUrl ? (
+                                  <span className="text-emerald-600 font-medium flex items-center gap-1">
+                                    <Check className="w-4 h-4" /> File loaded successfully!
+                                  </span>
+                                ) : (
+                                  <span>No file selected</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            disabled={isSavingTestimony}
+                            onClick={async () => {
+                              if (!testimonyTitle.trim()) {
+                                alert("Please provide a Title / Student Name.");
+                                return;
+                              }
+                              if (!testimonyUrl.trim()) {
+                                alert(`Please ${testimonyUploadType === "link" ? "paste a link" : "select a file"} first.`);
+                                return;
+                              }
+                              
+                              setIsSavingTestimony(true);
+                              try {
+                                const finalUrl = testimonyUploadType === "link" ? convertToEmbedUrl(testimonyUrl.trim()) : testimonyUrl;
+                                await addTestimonialVideo(testimonyTitle.trim(), finalUrl, testimonyUploadType);
+                                
+                                setTestimonyTitle("");
+                                setTestimonyUrl("");
+                                alert("Testimonial saved successfully!");
+                              } catch (err: any) {
+                                console.error("Error saving testimonial:", err);
+                                alert("Failed to save testimonial! If you uploaded a file, it may be too large. Try compressing it under 2MB or hosting it on YouTube.");
+                              } finally {
+                                setIsSavingTestimony(false);
+                              }
+                            }}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-md transition shadow flex items-center justify-center gap-2 disabled:bg-emerald-400 cursor-pointer"
+                          >
+                            {isSavingTestimony ? "Saving..." : "Save Testimonial"}
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     {testimonialVideos && testimonialVideos.length > 0 && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-                        {testimonialVideos.map((video) => (
-                          <div key={video.id} className="border border-slate-200 p-3 rounded-lg relative bg-slate-50">
-                            <button
-                              onClick={() => removeTestimonialVideo(video.id)}
-                              className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition shadow-sm z-10"
-                              title="Remove Video"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                            <h4 className="font-semibold text-sm mb-2 truncate" title={video.title}>{video.title}</h4>
-                            <div className="aspect-video w-full rounded-md overflow-hidden bg-slate-900">
-                              <iframe 
-                                src={video.url}
-                                title={video.title}
-                                className="w-full h-full"
-                                allowFullScreen
-                              />
+                        {testimonialVideos.map((video) => {
+                          const isAudio = video.type === "audio" || (video.type === undefined && (
+                            video.url.toLowerCase().startsWith('data:audio/') || 
+                            video.url.toLowerCase().endsWith('.mp3') || 
+                            video.url.toLowerCase().endsWith('.wav') || 
+                            video.url.toLowerCase().endsWith('.m4a') || 
+                            video.url.toLowerCase().endsWith('.ogg') || 
+                            video.url.toLowerCase().endsWith('.aac')
+                          ));
+
+                          const isUploadedVideo = !isAudio && (
+                            video.type === "video" || 
+                            video.url.toLowerCase().startsWith('data:video/') || 
+                            video.url.toLowerCase().endsWith('.mp4') || 
+                            video.url.toLowerCase().endsWith('.webm') || 
+                            video.url.toLowerCase().endsWith('.mov') || 
+                            video.url.toLowerCase().endsWith('.avi') || 
+                            video.url.toLowerCase().endsWith('.mkv')
+                          );
+
+                          return (
+                            <div key={video.id} className="border border-slate-200 p-3 rounded-lg relative bg-slate-50 flex flex-col justify-between">
+                              <button
+                                onClick={() => removeTestimonialVideo(video.id)}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition shadow-sm z-10 cursor-pointer"
+                                title="Remove Testimony"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              <h4 className="font-semibold text-sm mb-2 truncate text-slate-800" title={video.title}>{video.title}</h4>
+                              <div className="aspect-video w-full rounded-md overflow-hidden bg-slate-900 flex flex-col justify-center p-3 relative">
+                                {isAudio ? (
+                                  <div className="text-center space-y-2">
+                                    <div className="flex justify-center text-emerald-400">
+                                      <Headphones className="w-8 h-8 animate-pulse" />
+                                    </div>
+                                    <span className="text-xs text-slate-300 block font-medium">Audio Recording</span>
+                                    <audio controls className="w-full mt-1 h-8" src={video.url} />
+                                  </div>
+                                ) : isUploadedVideo ? (
+                                  <video 
+                                    src={video.url} 
+                                    controls 
+                                    className="w-full h-full object-contain" 
+                                  />
+                                ) : (
+                                  <iframe 
+                                    src={video.url}
+                                    title={video.title}
+                                    className="w-full h-full"
+                                    allowFullScreen
+                                  />
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1306,6 +1837,15 @@ export function Admin() {
                         placeholder="https://facebook.com/..."
                       />
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Custom Share Template Hook (Optional)</label>
+                      <textarea
+                        id="shareTemplateInput"
+                        defaultValue={shareTemplate || ""}
+                        className="w-full h-24 p-3 border rounded-md"
+                        placeholder="Enter a custom catchphrase or promotional hook to include in the generated share templates..."
+                      />
+                    </div>
                     <div className="flex justify-start">
                       <button 
                         onClick={() => {
@@ -1313,7 +1853,8 @@ export function Admin() {
                           const yt = (document.getElementById('youtubeUrlInput') as HTMLInputElement).value.trim();
                           const ig = (document.getElementById('instagramUrlInput') as HTMLInputElement).value.trim();
                           const fb = (document.getElementById('facebookUrlInput') as HTMLInputElement).value.trim();
-                          updateSocialLinks(wa, yt, ig, fb);
+                          const st = (document.getElementById('shareTemplateInput') as HTMLTextAreaElement).value.trim();
+                          updateSocialLinks(wa, yt, ig, fb, st);
                           alert('Social links updated successfully!');
                         }}
                         className="bg-sage-600 text-white px-4 py-2 rounded-md hover:bg-sage-700 transition shadow-sm text-sm"
@@ -1350,29 +1891,805 @@ export function Admin() {
                       </select>
                     </div>
 
-                    <div className="relative">
+                    <div className="bg-sage-50/50 p-3 rounded-lg border border-sage-100/80">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-sage-800 mb-2">
+                        WhatsApp Message Layout Strategy:
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTemplateLayout("video-top")}
+                          className={`flex items-center gap-2 p-2 rounded-md border text-xs font-medium transition text-left ${
+                            templateLayout === "video-top"
+                              ? "bg-sage-600 border-sage-600 text-white shadow-sm"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <VideoIcon className="w-4 h-4 shrink-0" />
+                          <div>
+                            <p className="font-semibold">Video Link at TOP</p>
+                            <p className="opacity-85 text-[10px]">Forces WhatsApp video preview card to load</p>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTemplateLayout("video-bottom")}
+                          className={`flex items-center gap-2 p-2 rounded-md border text-xs font-medium transition text-left ${
+                            templateLayout === "video-bottom"
+                              ? "bg-sage-600 border-sage-600 text-white shadow-sm"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <ExternalLink className="w-4 h-4 shrink-0" />
+                          <div>
+                            <p className="font-semibold">Register Link at TOP</p>
+                            <p className="opacity-85 text-[10px]">Standard layout (Register first, video bottom)</p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                     <div className="space-y-3">
                       <textarea
                         id="share-template"
                         className="w-full h-48 p-4 border border-slate-200 bg-slate-50 rounded-lg text-sm font-medium text-slate-700 focus:ring-2 focus:ring-sage-500 outline-none resize-none"
                         value={shareTemplateText}
                         onChange={(e) => setShareTemplateText(e.target.value)}
                       />
-                      <button 
-                        onClick={() => {
-                          const val = (document.getElementById('share-template') as HTMLTextAreaElement).value;
-                          navigator.clipboard.writeText(val);
-                          alert('Copied to clipboard! You can now paste it in WhatsApp.');
-                        }}
-                        className="absolute bottom-4 right-4 flex items-center gap-2 bg-sage-600 text-white px-3 py-1.5 rounded-md hover:bg-sage-700 transition shadow-sm text-sm"
-                      >
-                        <Copy className="w-4 h-4" /> Copy Text
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button 
+                          onClick={() => {
+                            const val = (document.getElementById('share-template') as HTMLTextAreaElement).value;
+                            navigator.clipboard.writeText(val);
+                            alert('Copied to clipboard! You can now paste it in WhatsApp.');
+                          }}
+                          className="flex-1 min-w-[120px] flex items-center justify-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 px-3 py-2 rounded-lg transition font-bold text-xs"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-slate-600" /> Copy Text
+                        </button>
+                        
+                        <button 
+                          onClick={() => {
+                            const val = (document.getElementById('share-template') as HTMLTextAreaElement).value;
+                            const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(val)}`;
+                            window.open(whatsappUrl, '_blank');
+                          }}
+                          className="flex-1 min-w-[150px] flex items-center justify-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-2 rounded-lg transition font-bold text-xs shadow-sm"
+                        >
+                          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.705 1.457h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413"/>
+                          </svg>
+                          <span>Share on WhatsApp</span>
+                        </button>
+                        
+                        <button 
+                          onClick={async () => {
+                            const val = (document.getElementById('share-template') as HTMLTextAreaElement).value;
+                            if (navigator.share) {
+                              try {
+                                await navigator.share({
+                                  text: val,
+                                });
+                              } catch (err) {
+                                console.log("Error sharing:", err);
+                              }
+                            } else {
+                              navigator.clipboard.writeText(val);
+                              alert('System sharing not supported on this browser. Text copied to clipboard instead!');
+                            }
+                          }}
+                          className="flex-1 min-w-[130px] flex items-center justify-center gap-2 bg-sage-600 text-white hover:bg-sage-700 px-3 py-2 rounded-lg transition font-bold text-xs shadow-sm"
+                        >
+                          <Share2 className="w-3.5 h-3.5" /> System Share
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Live WhatsApp / Social Media Mockup Preview */}
+                    {selectedCourseForTemplate && (() => {
+                      const selCourse = courses.find(c => c.id === selectedCourseForTemplate);
+                      if (!selCourse) return null;
+                      
+                      const formatWhatsAppPreviewText = (text: string) => {
+                        if (!text) return "";
+                        // Simple parser for WhatsApp markup
+                        // Escape basic HTML characters to avoid broken markup, then swap WhatsApp style tokens
+                        const escaped = text
+                          .replace(/&/g, "&amp;")
+                          .replace(/</g, "&lt;")
+                          .replace(/>/g, "&gt;");
+                        
+                        let formatted = escaped
+                          .replace(/\*(.*?)\*/g, "<strong>$1</strong>")
+                          .replace(/_(.*?)_/g, "<em>$1</em>")
+                          .replace(/~(.*?)~/g, "<del>$1</del>")
+                          .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-sky-600 hover:underline break-all font-medium">$1</a>');
+                        
+                        return <span dangerouslySetInnerHTML={{ __html: formatted.replace(/\n/g, "<br />") }} />;
+                      };
+
+                      return (
+                        <div className="mt-6 border border-slate-200/80 rounded-xl overflow-hidden shadow-sm bg-white">
+                          <div className="bg-slate-50 px-4 py-3 border-b flex justify-between items-center">
+                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Live Social Media / WhatsApp Mockup
+                            </span>
+                            <span className="text-[10px] bg-slate-200/80 text-slate-600 px-2.5 py-1 rounded-full font-bold">
+                              How shared message renders
+                            </span>
+                          </div>
+
+                          <div className="p-4 bg-slate-100 flex justify-center">
+                            {/* Device Frame */}
+                            <div className="w-full max-w-sm rounded-2xl border-4 border-slate-300 shadow-md bg-[#efeae2] overflow-hidden flex flex-col font-sans">
+                              {/* WhatsApp App Header */}
+                              <div className="bg-[#075e54] text-white px-3 py-2 flex items-center gap-2.5 shadow-sm">
+                                <div className="w-8 h-8 rounded-full bg-[#128c7e] flex items-center justify-center text-xs font-bold shrink-0 shadow-inner">
+                                  SL
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-xs truncate">Selvalakshmi Health Education</p>
+                                  <p className="text-[9px] opacity-85">Online</p>
+                                </div>
+                                <div className="flex items-center gap-3 opacity-90">
+                                  {/* Call icon representational */}
+                                  <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M20 15.5c-1.25 0-2.45-.2-3.57-.57a1.02 1.02 0 00-1.02.24l-2.2 2.2a15.045 15.045 0 01-6.59-6.59l2.2-2.2c.28-.28.36-.67.25-1.02A11.36 11.36 0 018.5 4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.5c0-.55-.45-1-1-1z"/></svg>
+                                  {/* Options icon */}
+                                  <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+                                </div>
+                              </div>
+
+                              {/* Chat Screen Viewport */}
+                              <div className="p-3 space-y-3 max-h-[480px] overflow-y-auto">
+                                
+                                {/* Date Stamp */}
+                                <div className="flex justify-center">
+                                  <span className="bg-white/80 backdrop-blur-sm text-[10px] text-slate-500 px-2 py-0.5 rounded shadow-xs uppercase font-medium">
+                                    Today
+                                  </span>
+                                </div>
+
+                                {/* Custom Sent Bubble representing the shared message */}
+                                <div className="relative bg-[#d9fdd3] text-slate-800 rounded-tr-none rounded-br-lg rounded-l-lg p-2.5 shadow-xs max-w-[90%] ml-auto text-xs space-y-2">
+                                  {/* Promo Video Render (at the top of the message bubble) */}
+                                  {selCourse.videoUrl && (
+                                    <div className="rounded-md overflow-hidden border border-[#bedbb7] bg-black mb-2 shadow-sm">
+                                      {(() => {
+                                        const videoUrl = selCourse.videoUrl || "";
+                                        const isUploaded = videoUrl.startsWith("data:");
+                                        const isAudio = videoUrl.toLowerCase().startsWith('data:audio/') || 
+                                                        (!isUploaded && (
+                                                          videoUrl.toLowerCase().endsWith('.mp3') || 
+                                                          videoUrl.toLowerCase().endsWith('.wav') || 
+                                                          videoUrl.toLowerCase().endsWith('.m4a') || 
+                                                          videoUrl.toLowerCase().endsWith('.ogg') || 
+                                                          videoUrl.toLowerCase().endsWith('.aac')
+                                                        ));
+
+                                        const isUploadedVideo = !isAudio && (
+                                          isUploaded ||
+                                          videoUrl.toLowerCase().endsWith('.mp4') || 
+                                          videoUrl.toLowerCase().endsWith('.webm') || 
+                                          videoUrl.toLowerCase().endsWith('.mov') || 
+                                          videoUrl.toLowerCase().endsWith('.avi') || 
+                                          videoUrl.toLowerCase().endsWith('.mkv')
+                                        );
+
+                                        if (isAudio) {
+                                          return (
+                                            <div className="w-full bg-[#111b21] p-3 flex items-center gap-3">
+                                              <div className="w-9 h-9 rounded-full bg-[#202c33] flex items-center justify-center shrink-0">
+                                                <span className="text-emerald-500 text-sm">🎙️</span>
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <audio src={videoUrl} controls className="w-full h-8" />
+                                                <p className="text-[10px] text-slate-400 mt-1 px-1 font-semibold">Course Audio Attached</p>
+                                              </div>
+                                            </div>
+                                          );
+                                        } else if (isUploadedVideo) {
+                                          return (
+                                            <div className="w-full aspect-video bg-black relative">
+                                              <video 
+                                                src={videoUrl} 
+                                                controls 
+                                                className="w-full h-full object-contain" 
+                                              />
+                                            </div>
+                                          );
+                                        } else {
+                                          // YouTube embed link
+                                          let embedUrl = videoUrl;
+                                          if (videoUrl.includes("youtube.com/watch?v=")) {
+                                            embedUrl = videoUrl.replace("youtube.com/watch?v=", "youtube.com/embed/");
+                                          } else if (videoUrl.includes("youtu.be/")) {
+                                            embedUrl = videoUrl.replace("youtu.be/", "youtube.com/embed/");
+                                          }
+                                          return (
+                                            <div className="w-full aspect-video bg-black">
+                                              <iframe 
+                                                src={embedUrl}
+                                                className="w-full h-full border-0"
+                                                allowFullScreen
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                              />
+                                            </div>
+                                          );
+                                        }
+                                      })()}
+                                    </div>
+                                  )}
+
+                                  {/* Course Poster Asset (Rendered at top if available and there's no video) */}
+                                  {selCourse.imageUrl && !selCourse.videoUrl && (
+                                    <div className="rounded-md overflow-hidden border border-[#bedbb7] bg-white mb-2">
+                                      <img src={selCourse.imageUrl} alt={selCourse.title} className="w-full h-32 object-cover" />
+                                    </div>
+                                  )}
+
+                                  {/* Message Text Block with WhatsApp parsers */}
+                                  <div className="whitespace-pre-wrap leading-relaxed text-slate-800 break-words font-medium">
+                                    {formatWhatsAppPreviewText(shareTemplateText)}
+                                  </div>
+
+                                  {/* Delivery Metadata (Time + Double Blue Checkmarks) */}
+                                  <div className="flex justify-end items-center gap-1 text-[8px] text-slate-500 select-none mt-1">
+                                    <span>12:00 PM</span>
+                                    <svg className="w-3 h-3 text-sky-500 fill-current" viewBox="0 0 24 24">
+                                      <path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17l-4.24-4.24-1.41 1.41 5.66 5.66L23.66 7l-1.42-1.41zM.41 13.41L1.82 12l5.66 5.66-1.42 1.41L.41 13.41z"/>
+                                    </svg>
+                                  </div>
+                                </div>
+
+                                {/* Shared Direct Preview Box Footer Card */}
+                                <div className="bg-white rounded-lg overflow-hidden border border-slate-200 shadow-xs max-w-[90%] ml-auto text-xs">
+                                  <div className="p-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                                    <span className="text-emerald-600 text-sm">🔗</span>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-bold text-[10px] text-slate-800 truncate">selvalakshmihealtheducation.in</p>
+                                      <p className="text-[9px] text-slate-500 truncate">Register for {selCourse.title}</p>
+                                    </div>
+                                  </div>
+                                  <div className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100/70 transition flex items-center justify-between font-bold text-emerald-800 text-[10px] cursor-pointer">
+                                    <span>🔗 FOR ADMISSION</span>
+                                    <span>➔</span>
+                                  </div>
+                                </div>
+
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {selectedCourseForTemplate && courses.find(c => c.id === selectedCourseForTemplate) && (() => {
+                      const selCourse = courses.find(c => c.id === selectedCourseForTemplate)!;
+                      const hasImage = !!selCourse.imageUrl;
+                      const hasVideo = !!selCourse.videoUrl;
+                      
+                      const triggerImageDownload = () => {
+                        if (!selCourse.imageUrl) return;
+                        try {
+                          const a = document.createElement("a");
+                          a.href = selCourse.imageUrl;
+                          const safeTitle = selCourse.title.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+                          a.download = `${safeTitle}_poster.png`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        } catch (err) {
+                          console.error("Failed to download image", err);
+                          window.open(selCourse.imageUrl, "_blank");
+                        }
+                      };
+
+                      const triggerVideoDownload = () => {
+                        if (!selCourse.videoUrl) return;
+                        try {
+                          const videoUrl = selCourse.videoUrl;
+                          if (!videoUrl.startsWith("data:")) {
+                            window.open(videoUrl, "_blank");
+                            return;
+                          }
+
+                          const isAudio = videoUrl.toLowerCase().startsWith('data:audio/') || 
+                                          videoUrl.toLowerCase().endsWith('.mp3') || 
+                                          videoUrl.toLowerCase().endsWith('.wav') || 
+                                          videoUrl.toLowerCase().endsWith('.m4a') || 
+                                          videoUrl.toLowerCase().endsWith('.ogg') || 
+                                          videoUrl.toLowerCase().endsWith('.aac');
+
+                          const a = document.createElement("a");
+                          a.href = videoUrl;
+                          const safeTitle = selCourse.title.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+                          
+                          let ext = "mp4";
+                          if (isAudio) {
+                            if (videoUrl.startsWith("data:audio/mp3") || videoUrl.startsWith("data:audio/mpeg")) ext = "mp3";
+                            else if (videoUrl.startsWith("data:audio/wav")) ext = "wav";
+                            else if (videoUrl.startsWith("data:audio/m4a")) ext = "m4a";
+                            else ext = "mp3";
+                          } else {
+                            if (videoUrl.startsWith("data:video/webm")) ext = "webm";
+                            else if (videoUrl.startsWith("data:video/ogg")) ext = "ogg";
+                            else ext = "mp4";
+                          }
+
+                          a.download = `${safeTitle}_promo.${ext}`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        } catch (err) {
+                          console.error("Failed to download video/audio", err);
+                          window.open(selCourse.videoUrl, "_blank");
+                        }
+                      };
+
+                      return (
+                        <div className="mt-4 bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-4">
+                          {/* Easy WhatsApp Sharing Instructions */}
+                          <div className="bg-emerald-50 border border-emerald-100/70 rounded-lg p-3 text-xs text-emerald-900 space-y-2">
+                            <div className="flex items-center gap-2 font-bold text-emerald-950 text-[13px]">
+                              <span className="text-base leading-none">💡</span>
+                              <span>How to Share Video/Audio on WhatsApp with Audience:</span>
+                            </div>
+                            <ol className="list-decimal list-inside space-y-1 text-emerald-950 font-medium opacity-90 pl-1">
+                              <li>
+                                {selCourse.videoUrl && selCourse.videoUrl.startsWith("data:") ? (
+                                  <span>
+                                    Click <strong>"Download Video/Audio"</strong> under the video card below to download the file to your phone/PC.
+                                  </span>
+                                ) : (
+                                  <span>
+                                    Use the <strong>"Video Link at TOP"</strong> layout so WhatsApp automatically generates a video player card!
+                                  </span>
+                                )}
+                              </li>
+                              <li>
+                                Click the <strong>"Copy Text"</strong> button above to copy the promotional details.
+                              </li>
+                              <li>
+                                On WhatsApp, <strong>attach/upload the downloaded video file</strong> and <strong>paste the copied text into the caption</strong> before sending!
+                              </li>
+                            </ol>
+                          </div>
+
+                          {/* Firebase Spark Plan Rate Exceeded Warning */}
+                          <div className="bg-amber-50 border border-amber-200/80 rounded-lg p-3.5 text-xs text-amber-900 space-y-2">
+                            <div className="flex items-center gap-2 font-bold text-amber-950 text-[13px]">
+                              <span className="text-base leading-none">⚠️</span>
+                              <span>Avoiding "Rate Exceeded" / "Quota Exceeded" Errors</span>
+                            </div>
+                            <p className="opacity-95 leading-relaxed">
+                              You are currently on the <strong>Firebase Spark (Free) Plan</strong>. Uploading media files (images, audio, or video) directly uses heavy database chunks and will trigger <strong>"Rate Exceeded"</strong> or <strong>"Quota Exceeded"</strong> errors if multiple files are uploaded.
+                            </p>
+                            <div className="bg-white/85 rounded-md p-2.5 border border-amber-200 text-[11px] font-medium text-amber-900 space-y-1">
+                              <p className="font-bold text-amber-950">🚀 100% Free & Unlimited Solution:</p>
+                              <p>1. Upload your video/audio to <strong>YouTube</strong> (as Public or Unlisted).</p>
+                              <p>2. Paste the YouTube link in the course details <strong>"Promotion Video URL"</strong> box instead of uploading a file!</p>
+                              <p className="text-emerald-800 font-semibold pt-1">This is completely free, loads instantly for your audience, and will never exceed database limits!</p>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center pt-2">
+                            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Course Media Assets Helper</h4>
+                            {isUploadingAsset && (
+                              <div className="flex items-center gap-2 text-xs text-sage-600 font-medium animate-pulse">
+                                <div className="w-3.5 h-3.5 border-2 border-sage-600 border-t-transparent rounded-full animate-spin"></div>
+                                <span>Saving...</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Course Poster Card */}
+                            <div className="border border-slate-200 rounded-lg p-3 bg-white flex flex-col justify-between min-h-[160px]">
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-wider">COURSE POSTER</span>
+                                {helperPosterDataUrl ? (
+                                  <div className="flex flex-col items-center">
+                                    <span className="text-[11px] font-semibold text-amber-600 mb-1">Pending Save:</span>
+                                    <img 
+                                      src={helperPosterDataUrl} 
+                                      alt="Pending Course Poster" 
+                                      className="max-h-24 object-contain rounded border-2 border-amber-300 mb-3 mx-auto animate-pulse"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                    <span className="text-[10px] text-slate-500 mb-2 truncate max-w-full text-center">{helperPosterFile?.name}</span>
+                                  </div>
+                                ) : hasImage ? (
+                                  <div className="flex flex-col items-center">
+                                    {selCourse.imageUrl!.startsWith("data:") ? (
+                                      <img 
+                                        src={selCourse.imageUrl} 
+                                        alt="Course Poster" 
+                                        className="max-h-24 object-contain rounded border border-slate-100 mb-3 mx-auto"
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    ) : (
+                                      <div className="bg-slate-50 border border-dashed rounded p-3 text-center text-xs text-slate-500 mb-3 truncate w-full">
+                                        <span className="block font-medium truncate">{selCourse.imageUrl}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="bg-slate-50 border border-dashed rounded-lg p-4 text-center text-xs text-slate-400 flex flex-col items-center justify-center h-24 mb-3">
+                                    <ImageIcon className="w-6 h-6 text-slate-300 mb-1" />
+                                    <span>No poster image uploaded yet</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {helperPosterDataUrl ? (
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setHelperPosterFile(null);
+                                      setHelperPosterDataUrl(null);
+                                    }}
+                                    className="flex-1 bg-slate-100 text-slate-700 hover:bg-slate-200 py-1.5 rounded text-xs font-semibold transition"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      setIsUploadingAsset(true);
+                                      try {
+                                        await updateCourse({ ...selCourse, imageUrl: helperPosterDataUrl });
+                                        alert("Course poster image saved successfully!");
+                                        setHelperPosterFile(null);
+                                        setHelperPosterDataUrl(null);
+                                      } catch (err) {
+                                        alert("Failed to save poster image.");
+                                      } finally {
+                                        setIsUploadingAsset(false);
+                                      }
+                                    }}
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 rounded text-xs font-semibold transition"
+                                  >
+                                    Save Poster
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2">
+                                  {hasImage && (
+                                    <button
+                                      onClick={triggerImageDownload}
+                                      className="flex-1 flex items-center justify-center gap-1 bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 py-1.5 rounded text-xs font-semibold transition"
+                                    >
+                                      <Download className="w-3 h-3" /> Download
+                                    </button>
+                                  )}
+                                  <label className="flex-1 cursor-pointer flex items-center justify-center gap-1 bg-sage-50 text-sage-800 border border-sage-200 hover:bg-sage-100 py-1.5 rounded text-xs font-semibold transition">
+                                    <Upload className="w-3 h-3" />
+                                    <span>{hasImage ? "Change" : "Upload Image"}</span>
+                                    <input 
+                                      type="file" 
+                                      accept="image/*" 
+                                      className="hidden" 
+                                      disabled={isUploadingAsset}
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          resizeImage(file, 800, 800, (resizedDataUrl) => {
+                                            setHelperPosterFile(file);
+                                            setHelperPosterDataUrl(resizedDataUrl);
+                                          });
+                                        }
+                                      }} 
+                                    />
+                                  </label>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Course Promotion Video Card */}
+                            <div className="border border-slate-200 rounded-lg p-3 bg-white flex flex-col justify-between min-h-[160px]">
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-400 block mb-2 uppercase tracking-wider">COURSE VIDEO / AUDIO (PROMOTIONAL)</span>
+                                {helperVideoDataUrl ? (
+                                  <div className="flex flex-col items-center w-full">
+                                    <span className="text-[11px] font-semibold text-amber-600 mb-1">Pending Save:</span>
+                                    <div className="bg-amber-50 border border-dashed border-amber-300 rounded p-3 text-center text-xs text-slate-500 mb-3 truncate w-full flex flex-col items-center justify-center h-24 animate-pulse">
+                                      <VideoIcon className="w-6 h-6 text-amber-500 mb-1" />
+                                      <span className="block font-medium truncate max-w-full text-[11px] text-slate-700">
+                                        {helperVideoFile?.name}
+                                      </span>
+                                      <span className="text-[9px] text-slate-400 block">
+                                        ({(helperVideoFile!.size / (1024 * 1024)).toFixed(2)} MB)
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : hasVideo ? (() => {
+                                  const videoUrl = selCourse.videoUrl || "";
+                                  const isUploaded = videoUrl.startsWith("data:");
+                                  const isAudio = videoUrl.toLowerCase().startsWith('data:audio/') || 
+                                                  (!isUploaded && (
+                                                    videoUrl.toLowerCase().endsWith('.mp3') || 
+                                                    videoUrl.toLowerCase().endsWith('.wav') || 
+                                                    videoUrl.toLowerCase().endsWith('.m4a') || 
+                                                    videoUrl.toLowerCase().endsWith('.ogg') || 
+                                                    videoUrl.toLowerCase().endsWith('.aac')
+                                                  ));
+
+                                  const isUploadedVideo = !isAudio && (
+                                    isUploaded ||
+                                    videoUrl.toLowerCase().endsWith('.mp4') || 
+                                    videoUrl.toLowerCase().endsWith('.webm') || 
+                                    videoUrl.toLowerCase().endsWith('.mov') || 
+                                    videoUrl.toLowerCase().endsWith('.avi') || 
+                                    videoUrl.toLowerCase().endsWith('.mkv')
+                                  );
+
+                                  return (
+                                    <div className="w-full aspect-video rounded-lg overflow-hidden border border-slate-200 bg-slate-900 flex items-center justify-center relative mb-3">
+                                      {isAudio ? (
+                                        <div className="w-full p-4 flex flex-col items-center justify-center gap-2">
+                                          <Headphones className="w-8 h-8 text-emerald-400 animate-pulse" />
+                                          <span className="text-[10px] text-slate-400 font-mono">Audio Preview</span>
+                                          <audio src={videoUrl} controls className="w-full max-w-xs h-8" />
+                                        </div>
+                                      ) : isUploadedVideo ? (
+                                        <video src={videoUrl} controls className="w-full h-full object-contain" />
+                                      ) : (
+                                        <iframe 
+                                          src={videoUrl} 
+                                          className="w-full h-full border-0" 
+                                          allowFullScreen
+                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        />
+                                      )}
+                                    </div>
+                                  );
+                                })() : (
+                                  <div className="bg-slate-50 border border-dashed rounded-lg p-4 text-center text-xs text-slate-400 flex flex-col items-center justify-center h-24 mb-3">
+                                    <VideoIcon className="w-6 h-6 text-slate-300 mb-1" />
+                                    <span>No promotional video or audio uploaded yet</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {helperVideoDataUrl ? (
+                                  <div className="flex gap-2 w-full">
+                                    <button
+                                      onClick={() => {
+                                        setHelperVideoFile(null);
+                                        setHelperVideoDataUrl(null);
+                                      }}
+                                      className="flex-1 bg-slate-100 text-slate-700 hover:bg-slate-200 py-1.5 rounded text-xs font-semibold transition"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        setIsUploadingAsset(true);
+                                        try {
+                                          await updateCourse({ ...selCourse, videoUrl: helperVideoDataUrl });
+                                          alert("Course promotion video/audio file saved successfully!");
+                                          setHelperVideoFile(null);
+                                          setHelperVideoDataUrl(null);
+                                        } catch (err) {
+                                          alert("Failed to save video/audio file.");
+                                        } finally {
+                                          setIsUploadingAsset(false);
+                                        }
+                                      }}
+                                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 rounded text-xs font-semibold transition animate-bounce"
+                                    >
+                                      Save Video
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-2 w-full">
+                                    {hasVideo && (
+                                      selCourse.videoUrl!.startsWith("data:") ? (
+                                        <button
+                                          type="button"
+                                          onClick={triggerVideoDownload}
+                                          className="flex-1 flex items-center justify-center gap-1 bg-emerald-600 text-white hover:bg-emerald-700 py-1.5 rounded text-xs font-semibold transition shadow-sm"
+                                        >
+                                          <Download className="w-3.5 h-3.5" /> Download File
+                                        </button>
+                                      ) : (
+                                        <a
+                                          href={selCourse.videoUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex-1 flex items-center justify-center gap-1 bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 py-1.5 rounded text-xs font-semibold transition"
+                                        >
+                                          <ExternalLink className="w-3 h-3" /> View Video
+                                        </a>
+                                      )
+                                    )}
+                                    <label className="flex-1 cursor-pointer flex items-center justify-center gap-1 bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 py-1.5 rounded text-xs font-semibold transition">
+                                      <Upload className="w-3 h-3" />
+                                      <span>{hasVideo ? "Change File" : "Upload Video"}</span>
+                                      <input 
+                                        type="file" 
+                                        accept="video/*,audio/*" 
+                                        className="hidden" 
+                                        disabled={isUploadingAsset}
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            // Support files up to 15MB
+                                            if (file.size > 15000000) {
+                                              alert("Uploaded promotional/audio files must be under 15MB.\n\nTips:\n- Compress your video/audio file using a free online compressor.\n- Or, upload the video to YouTube (highly recommended) and simply paste the YouTube watch/embed link!");
+                                              return;
+                                            }
+                                            setIsUploadingAsset(true);
+                                            const reader = new FileReader();
+                                            reader.onload = (event) => {
+                                              if (event.target?.result) {
+                                                setHelperVideoFile(file);
+                                                setHelperVideoDataUrl(event.target.result as string);
+                                              }
+                                              setIsUploadingAsset(false);
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }
+                                        }} 
+                                      />
+                                    </label>
+                                  </div>
+                                )}
+                                
+                                {!helperVideoDataUrl && (
+                                  <div className="flex gap-2">
+                                    <input 
+                                      type="text" 
+                                      id="directYoutubeLinkInput"
+                                      placeholder="Or paste link..." 
+                                      className="flex-1 px-2 py-1 border border-slate-200 rounded text-xs"
+                                      onKeyDown={async (e) => {
+                                        if (e.key === 'Enter') {
+                                          const val = (e.currentTarget as HTMLInputElement).value.trim();
+                                          if (val) {
+                                            setIsUploadingAsset(true);
+                                            try {
+                                              const finalUrl = convertToEmbedUrl(val);
+                                              await updateCourse({ ...selCourse, videoUrl: finalUrl });
+                                              (e.currentTarget as HTMLInputElement).value = "";
+                                              alert("Promotion video link updated successfully!");
+                                            } catch (err) {
+                                              alert("Failed to update video link.");
+                                            } finally {
+                                              setIsUploadingAsset(false);
+                                            }
+                                          }
+                                        }
+                                      }}
+                                    />
+                                    <button
+                                      onClick={async () => {
+                                        const inputEl = document.getElementById("directYoutubeLinkInput") as HTMLInputElement;
+                                        const val = inputEl?.value.trim();
+                                        if (val) {
+                                          setIsUploadingAsset(true);
+                                          try {
+                                            const finalUrl = convertToEmbedUrl(val);
+                                            await updateCourse({ ...selCourse, videoUrl: finalUrl });
+                                            inputEl.value = "";
+                                            alert("Promotion video link updated successfully!");
+                                          } catch (err) {
+                                            alert("Failed to update video link.");
+                                          } finally {
+                                            setIsUploadingAsset(false);
+                                          }
+                                        } else {
+                                          alert("Please enter a URL first.");
+                                        }
+                                      }}
+                                      className="bg-slate-800 text-white px-2 py-1 rounded text-xs hover:bg-slate-900 transition font-medium"
+                                    >
+                                      Save Link
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
             )}
             
+            {/* Student Tracker View Modal */}
+            {viewingTrackerStudentId && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
+                  <div className="sticky top-0 bg-white p-6 border-b border-sage-100 flex justify-between items-center z-10">
+                    <h2 className="text-xl font-bold font-serif text-sage-900">
+                      Student Tracker: {students.find(s => s.id === viewingTrackerStudentId)?.firstName} {students.find(s => s.id === viewingTrackerStudentId)?.lastName}
+                    </h2>
+                    <button onClick={() => setViewingTrackerStudentId(null)} className="text-slate-400 hover:text-slate-600 transition">
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                  <div className="p-6 space-y-6">
+                    {(() => {
+                      const st = students.find(s => s.id === viewingTrackerStudentId);
+                      if (!st) return <p>Student not found.</p>;
+                      const tracker = st.healthTracker;
+                      return (
+                        <>
+                          {st.assignmentVideoUrl && (
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                              <h3 className="font-bold text-slate-800 mb-2">Assignment Video</h3>
+                              <a href={st.assignmentVideoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
+                                {st.assignmentVideoUrl}
+                              </a>
+                            </div>
+                          )}
+                          {!tracker ? (
+                            <p className="text-slate-500 italic">No tracker data submitted yet.</p>
+                          ) : (
+                            <>
+                              <div className="mb-4">
+                                <h3 className="font-bold text-slate-800 text-lg">
+                                  Condition: <span className="text-sage-700">{tracker.diseaseTitle || "Not specified"}</span>
+                                </h3>
+                              </div>
+                              <div>
+                                <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">Diet Tracker (7 Days)</h3>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm text-left">
+                                    <thead className="text-xs text-slate-700 uppercase bg-slate-100">
+                                      <tr>
+                                        <th className="px-4 py-2">Day</th>
+                                        <th className="px-4 py-2 text-center">Morning</th>
+                                        <th className="px-4 py-2 text-center">Breakfast</th>
+                                        <th className="px-4 py-2 text-center">Lunch</th>
+                                        <th className="px-4 py-2 text-center">Evening</th>
+                                        <th className="px-4 py-2 text-center">Dinner</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {[1, 2, 3, 4, 5, 6, 7].map(day => {
+                                        const dayData = tracker.dailyDiet[day.toString()];
+                                        return (
+                                          <tr key={day} className="border-b">
+                                            <td className="px-4 py-2 font-medium">Day {day}</td>
+                                            <td className="px-4 py-2 text-center">{dayData?.morningDrink ? "✅" : "❌"}</td>
+                                            <td className="px-4 py-2 text-center">{dayData?.breakfast ? "✅" : "❌"}</td>
+                                            <td className="px-4 py-2 text-center">{dayData?.lunch ? "✅" : "❌"}</td>
+                                            <td className="px-4 py-2 text-center">{dayData?.eveningDrink ? "✅" : "❌"}</td>
+                                            <td className="px-4 py-2 text-center">{dayData?.dinner ? "✅" : "❌"}</td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                              <div className="grid md:grid-cols-2 gap-6 mt-6">
+                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                  <h3 className="font-bold text-slate-800 mb-3">Blood Test: Day 1</h3>
+                                  <p className="text-sm"><span className="text-slate-500">Before Food (Fasting):</span> {tracker.bloodTestDay1?.fastingSugar || "-"}</p>
+                                  <p className="text-sm"><span className="text-slate-500">After Food (Post-Prandial):</span> {tracker.bloodTestDay1?.postPrandialSugar || "-"}</p>
+                                </div>
+                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                  <h3 className="font-bold text-slate-800 mb-3">Blood Test: Day 8</h3>
+                                  <p className="text-sm"><span className="text-slate-500">Before Food (Fasting):</span> {tracker.bloodTestDay8?.fastingSugar || "-"}</p>
+                                  <p className="text-sm"><span className="text-slate-500">After Food (Post-Prandial):</span> {tracker.bloodTestDay8?.postPrandialSugar || "-"}</p>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Quiz Editor Modal */}
             {editingQuizVideoId && editingQuizData && (
               <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">

@@ -1,4 +1,4 @@
-import { MessageCircle, Youtube, Instagram, Facebook } from "lucide-react";
+import { MessageCircle, Youtube, Instagram, Facebook, MapPin, Phone, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 
@@ -12,12 +12,21 @@ export function Footer() {
         {/* Contact Details */}
         <div>
           <h3 className="text-white font-bold text-lg mb-4">Contact Us</h3>
-          <p className="text-sm text-sage-300 leading-relaxed mb-4">
-            3, Vivekananda road, P. N. Pudur, Coimbatore - 641041.
-          </p>
-          <div className="text-sm text-sage-300 flex flex-col gap-2">
-            <a href="tel:+918072887131" className="hover:text-white transition-colors font-medium">+91 8072 887 131</a>
-            <a href="mailto:info@selvalakshmihealtheducation.in" className="hover:text-white transition-colors">info@selvalakshmihealtheducation.in</a>
+          <div className="text-sm text-sage-300 flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <MapPin className="w-5 h-5 text-sage-400 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                3, Vivekananda road, P. N. Pudur, Coimbatore - 641041.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Phone className="w-5 h-5 text-sage-400 shrink-0" />
+              <a href="tel:+918072887131" className="hover:text-white transition-colors font-medium">+91 8072 887 131</a>
+            </div>
+            <div className="flex items-center gap-3">
+              <Mail className="w-5 h-5 text-sage-400 shrink-0" />
+              <a href="mailto:info@selvalakshmihealtheducation.in" className="hover:text-white transition-colors">info@selvalakshmihealtheducation.in</a>
+            </div>
           </div>
         </div>
 
