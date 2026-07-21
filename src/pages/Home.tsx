@@ -297,65 +297,79 @@ export function Home() {
             <h3 className="text-xl font-serif font-bold text-sage-900 mb-2">Share Testimonial</h3>
             <p className="text-sm text-slate-500 mb-6">Share "{activeShareVideo.title}" with friends on social media</p>
             
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              {/* WhatsApp */}
-              <a 
-                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out this student testimonial from Selvalakshmi Institute: ${activeShareVideo.title} - ${getShareUrl(activeShareVideo)}`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col items-center gap-2 group"
-              >
-                <div className="w-12 h-12 rounded-full bg-[#25D366]/10 text-[#25D366] flex items-center justify-center group-hover:scale-110 transition duration-300">
-                  <MessageCircle className="w-6 h-6 fill-current" />
-                </div>
-                <span className="text-xs font-semibold text-slate-700">WhatsApp</span>
-              </a>
+            {(() => {
+              const shareUrl = getShareUrl(activeShareVideo);
+              const shareMsg = `🌟 *Student Testimonial from Selvalakshmi Institute* 🌟\n\n` +
+                `🎓 *Course Success Story:* ${activeShareVideo.title}\n\n` +
+                `✨ Discover how ancient holistic healing (Muthra Acupressure & Natural Foods) can restore balance and support natural healing!\n\n` +
+                `👇 *Watch the testimonial here:* \n` +
+                `🔗 ${shareUrl}`;
+                
+              const twitterMsg = `Student success testimonial from Selvalakshmi Institute: "${activeShareVideo.title}"`;
+              const telegramMsg = `🌟 *Student Testimonial from Selvalakshmi Institute* 🌟\n\n🎓 *Success Story:* ${activeShareVideo.title}\n\n👇 *Watch the testimonial here:* \n🔗 ${shareUrl}`;
 
-              {/* Facebook */}
-              <a 
-                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl(activeShareVideo))}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col items-center gap-2 group"
-              >
-                <div className="w-12 h-12 rounded-full bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center group-hover:scale-110 transition duration-300">
-                  <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                </div>
-                <span className="text-xs font-semibold text-slate-700">Facebook</span>
-              </a>
+              return (
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  {/* WhatsApp */}
+                  <a 
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center gap-2 group"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#25D366]/10 text-[#25D366] flex items-center justify-center group-hover:scale-110 transition duration-300">
+                      <MessageCircle className="w-6 h-6 fill-current" />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700">WhatsApp</span>
+                  </a>
 
-              {/* Twitter / X */}
-              <a 
-                href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(getShareUrl(activeShareVideo))}&text=${encodeURIComponent(`Student testimonial from Selvalakshmi Institute: ${activeShareVideo.title}`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col items-center gap-2 group"
-              >
-                <div className="w-12 h-12 rounded-full bg-slate-950/10 text-slate-900 flex items-center justify-center group-hover:scale-110 transition duration-300">
-                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                  </svg>
-                </div>
-                <span className="text-xs font-semibold text-slate-700">Twitter / X</span>
-              </a>
+                  {/* Facebook */}
+                  <a 
+                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center gap-2 group"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center group-hover:scale-110 transition duration-300">
+                      <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                      </svg>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700">Facebook</span>
+                  </a>
 
-              {/* Telegram */}
-              <a 
-                href={`https://t.me/share/url?url=${encodeURIComponent(getShareUrl(activeShareVideo))}&text=${encodeURIComponent(`Student testimonial from Selvalakshmi Institute: ${activeShareVideo.title}`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col items-center gap-2 group"
-              >
-                <div className="w-12 h-12 rounded-full bg-[#0088cc]/10 text-[#0088cc] flex items-center justify-center group-hover:scale-110 transition duration-300">
-                  <svg className="w-5.5 h-5.5 fill-current" viewBox="0 0 24 24">
-                    <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.703.064-1.237-.465-1.917-.911-1.066-.7-1.67-1.131-2.705-1.812-1.196-.789-.42-1.223.26-1.93.179-.184 3.29-3.018 3.35-3.275.008-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.324-.437.893-.663 3.507-1.523 5.845-2.528 7.014-3.013 3.336-1.381 4.03-1.62 4.482-1.628.1.002.322.028.465.144.12.097.153.227.161.321.008.093.018.291.01 1.05z"/>
-                  </svg>
+                  {/* Twitter / X */}
+                  <a 
+                    href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(twitterMsg)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center gap-2 group"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-slate-950/10 text-slate-900 flex items-center justify-center group-hover:scale-110 transition duration-300">
+                      <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700">Twitter / X</span>
+                  </a>
+
+                  {/* Telegram */}
+                  <a 
+                    href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(telegramMsg)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center gap-2 group"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#0088cc]/10 text-[#0088cc] flex items-center justify-center group-hover:scale-110 transition duration-300">
+                      <svg className="w-5.5 h-5.5 fill-current" viewBox="0 0 24 24">
+                        <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.703.064-1.237-.465-1.917-.911-1.066-.7-1.67-1.131-2.705-1.812-1.196-.789-.42-1.223.26-1.93.179-.184 3.29-3.018 3.35-3.275.008-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.324-.437.893-.663 3.507-1.523 5.845-2.528 7.014-3.013 3.336-1.381 4.03-1.62 4.482-1.628.1.002.322.028.465.144.12.097.153.227.161.321.008.093.018.291.01 1.05z"/>
+                      </svg>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700">Telegram</span>
+                  </a>
                 </div>
-                <span className="text-xs font-semibold text-slate-700">Telegram</span>
-              </a>
-            </div>
+              );
+            })()}
 
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2">
               <input 

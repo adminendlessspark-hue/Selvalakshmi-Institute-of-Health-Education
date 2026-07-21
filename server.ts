@@ -172,6 +172,134 @@ app.get("/register", async (req, res, next) => {
   res.send(html);
 });
 
+// Dynamic Metadata Route for / (Home / Testimony preview)
+app.get(["/", "/index.html"], async (req, res, next) => {
+  const projectId = "gen-lang-client-0774589767";
+  const databaseId = "ai-studio-selvalakshmifoun-06cf7884-eb4f-48b6-b930-3989fc202d2d";
+  let testimonyId = req.query.testimony as string;
+  if (testimonyId) {
+    try {
+      testimonyId = decodeURIComponent(testimonyId);
+    } catch (e) {
+      // already decoded or malformed
+    }
+  }
+
+  // If there is no testimony parameter, let Vite or static handler handle it
+  if (!testimonyId) {
+    return next();
+  }
+
+  let title = "Selvalakshmi Institute";
+  let description = "Empower yourself with ancient holistic healing. Join our certified courses in Muthra Acupressure & Natural Foods.";
+  let imageUrl = "https://www.selvalakshmihealtheducation.in/whatsapp_share_preview.jpg";
+  let videoUrl = "";
+  let videoType = "text/html";
+
+  try {
+    const response = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/testimonialVideos/${encodeURIComponent(testimonyId)}`);
+    if (response.ok) {
+      const data = await response.json();
+      const fields = data.fields || {};
+      
+      const testimonialTitle = fields.title?.stringValue || "";
+      const testimonialUrl = fields.url?.stringValue || "";
+      
+      if (testimonialTitle) {
+        title = `Student Testimonial: ${testimonialTitle} | Selvalakshmi Institute`;
+        description = `Watch this inspiring student testimonial from Selvalakshmi Institute. Learn how our certified courses restored balance and helped heal naturally.`;
+        
+        if (testimonialUrl && testimonialUrl !== "chunked") {
+          let isYouTube = false;
+          let youtubeId = "";
+          
+          if (testimonialUrl.includes("youtube.com/watch?v=")) {
+            isYouTube = true;
+            const match = testimonialUrl.match(/v=([^&]+)/);
+            if (match) youtubeId = match[1];
+          } else if (testimonialUrl.includes("youtu.be/")) {
+            isYouTube = true;
+            const match = testimonialUrl.match(/youtu\.be\/([^?&#\s]+)/);
+            if (match) youtubeId = match[1];
+          } else if (testimonialUrl.includes("youtube.com/embed/")) {
+            isYouTube = true;
+            const match = testimonialUrl.match(/embed\/([^?&#\s]+)/);
+            if (match) youtubeId = match[1];
+          }
+
+          if (isYouTube) {
+            videoUrl = youtubeId ? `https://www.youtube.com/embed/${youtubeId}` : testimonialUrl;
+            videoType = "text/html";
+            if (youtubeId) {
+              imageUrl = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+            }
+          } else if (testimonialUrl.startsWith("http")) {
+            videoUrl = testimonialUrl;
+            videoType = "video/mp4";
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching testimonial from Firestore REST:", error);
+  }
+
+  // Read index.html (depending on env)
+  let htmlPath = "";
+  if (process.env.NODE_ENV !== "production") {
+    htmlPath = path.join(process.cwd(), "index.html");
+  } else {
+    htmlPath = path.join(process.cwd(), "dist", "index.html");
+  }
+
+  let html = "";
+  try {
+    html = fs.readFileSync(htmlPath, "utf-8");
+  } catch (err) {
+    console.error("Failed to read index.html:", err);
+    return res.status(500).send("Internal Server Error");
+  }
+
+  // Sanitize values for inclusion in meta attributes
+  const cleanTitle = title.replace(/"/g, '&quot;');
+  const cleanDescription = description.replace(/"/g, '&quot;').replace(/\r?\n/g, ' ');
+  const currentUrl = `https://www.selvalakshmihealtheducation.in${req.originalUrl}`;
+
+  const metaTags = `
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="${videoUrl ? 'video.other' : 'website'}" />
+    <meta property="og:title" content="${cleanTitle}" />
+    <meta property="og:description" content="${cleanDescription}" />
+    <meta property="og:url" content="${currentUrl}" />
+    <meta property="og:site_name" content="Selvalakshmi Institute" />
+    ${imageUrl ? `
+    <meta property="og:image" content="${imageUrl}" />
+    <meta property="og:image:secure_url" content="${imageUrl}" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="720" />
+    ` : ''}
+    ${videoUrl ? `
+    <meta property="og:video" content="${videoUrl}" />
+    <meta property="og:video:secure_url" content="${videoUrl}" />
+    <meta property="og:video:type" content="${videoType}" />
+    <meta property="og:video:width" content="1280" />
+    <meta property="og:video:height" content="720" />
+    ` : ''}
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:title" content="${cleanTitle}" />
+    <meta property="twitter:description" content="${cleanDescription}" />
+    ${imageUrl ? `<meta property="twitter:image" content="${imageUrl}" />` : ''}
+  `;
+
+  html = html.replace(/<title>[^<]*<\/title>/i, `<title>${cleanTitle}</title>`);
+  html = html.replace("</head>", `${metaTags}\n</head>`);
+
+  res.send(html);
+});
+
 // Initialize Razorpay lazily
 let razorpayClient: Razorpay | null = null;
 function getRazorpay(): Razorpay {

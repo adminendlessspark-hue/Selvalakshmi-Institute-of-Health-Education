@@ -574,6 +574,18 @@ export function Register() {
                   const courseFeeText = selectedCourseObj.fee 
                     ? (selectedCourseObj.fee.toLowerCase() === 'free' || selectedCourseObj.fee.includes('₹') ? selectedCourseObj.fee : `₹${selectedCourseObj.fee}`)
                     : 'N/A';
+
+                  const videoLineEn = selectedCourseObj.videoUrl ? `\n\n📺 *Watch Intro Video:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
+                  const posterLineEn = (selectedCourseObj.imageUrl && !selectedCourseObj.imageUrl.startsWith("data:")) ? `\n\n🖼️ *Course Poster:* \n🔗 ${selectedCourseObj.imageUrl}` : "";
+                  
+                  const videoLineTa = selectedCourseObj.videoUrl ? `\n\n📺 *அறிமுக வீடியோவை பார்க்க:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
+                  const posterLineTa = (selectedCourseObj.imageUrl && !selectedCourseObj.imageUrl.startsWith("data:")) ? `\n\n🖼️ *வகுப்பு போஸ்டர்:* \n🔗 ${selectedCourseObj.imageUrl}` : "";
+
+                  const shareMsg = language === "en"
+                    ? `🌟 *Join our program: ${selectedCourseObj.title}* 🌟\n\n⏱️ *Duration:* ${selectedCourseObj.duration || 'N/A'}\n💰 *Fee:* ${courseFeeText}${videoLineEn}${posterLineEn}\n\n✨ *Course Overview & Highlights:* \n${selectedCourseObj.description}\n\n👇 *Register here:* \n🔗 ${encodedUrl}`
+                    : `🌟 *எங்களது புதிய வகுப்பில் இணையுங்கள்: ${selectedCourseObj.title}* 🌟\n\n⏱️ *கால அளவு:* ${selectedCourseObj.duration || 'N/A'}\n💰 *கட்டணம்:* ${courseFeeText}${videoLineTa}${posterLineTa}\n\n✨ *வகுப்பு அறிமுகம் & சிறப்பம்சங்கள்:* \n${selectedCourseObj.description}\n\n👇 *இப்போதே பதிவு செய்ய:* \n🔗 ${encodedUrl}`;
+                  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
+
                   return (
                     <div className="mt-6 p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-3">
                       <div className="flex items-center justify-between">
@@ -619,26 +631,15 @@ export function Register() {
                             )}
                           </button>
                           
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const videoLineEn = selectedCourseObj.videoUrl ? `\n\n📺 *Watch Intro Video:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
-                              const posterLineEn = (selectedCourseObj.imageUrl && !selectedCourseObj.imageUrl.startsWith("data:")) ? `\n\n🖼️ *Course Poster:* \n🔗 ${selectedCourseObj.imageUrl}` : "";
-                              
-                              const videoLineTa = selectedCourseObj.videoUrl ? `\n\n📺 *அறிமுக வீடியோவை பார்க்க:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
-                              const posterLineTa = (selectedCourseObj.imageUrl && !selectedCourseObj.imageUrl.startsWith("data:")) ? `\n\n🖼️ *வகுப்பு போஸ்டர்:* \n🔗 ${selectedCourseObj.imageUrl}` : "";
-
-                              const shareMsg = language === "en"
-                                ? `🌟 *Join our program: ${selectedCourseObj.title}* 🌟\n\n⏱️ *Duration:* ${selectedCourseObj.duration || 'N/A'}\n💰 *Fee:* ${courseFeeText}${videoLineEn}${posterLineEn}\n\n✨ *Course Overview & Highlights:* \n${selectedCourseObj.description}\n\n👇 *Register here:* \n🔗 ${encodedUrl}`
-                                : `🌟 *எங்களது புதிய வகுப்பில் இணையுங்கள்: ${selectedCourseObj.title}* 🌟\n\n⏱️ *கால அளவு:* ${selectedCourseObj.duration || 'N/A'}\n💰 *கட்டணம்:* ${courseFeeText}${videoLineTa}${posterLineTa}\n\n✨ *வகுப்பு அறிமுகம் & சிறப்பம்சங்கள்:* \n${selectedCourseObj.description}\n\n👇 *இப்போதே பதிவு செய்ய:* \n🔗 ${encodedUrl}`;
-                              const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
-                              window.open(whatsappUrl, '_blank');
-                            }}
+                          <a
+                            href={whatsappUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg transition font-bold text-xs shadow-sm"
                           >
                             <Share2 className="w-3.5 h-3.5" />
                             <span>{language === "en" ? "Share" : "பகிர்"}</span>
-                          </button>
+                          </a>
                         </div>
                       </div>
                     </div>
