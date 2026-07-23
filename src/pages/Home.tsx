@@ -4,6 +4,7 @@ import { useStore } from "../context/StoreContext";
 import { ArrowRight, Leaf, Heart, BookOpen, Youtube, Instagram, MessageCircle, Hand, Target, Headphones, Play, Pause, Volume2, Share2, Copy, Check, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { TestimonialVideo } from "../types";
+import { shareToWhatsApp, openExternalUrl } from "../lib/share";
 
 export function Home() {
   const { courses, logoUrl, heroImages, heroOverlayColor, heroOverlayOpacity, testimonialVideos, founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl, muthraIconUrl, acupressureIconUrl, foodIconUrl, webinarVisible, isAdmin } = useStore();
@@ -311,24 +312,22 @@ export function Home() {
               return (
                 <div className="grid grid-cols-4 gap-4 mb-6">
                   {/* WhatsApp */}
-                  <a 
-                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col items-center gap-2 group"
+                  <button 
+                    type="button"
+                    onClick={() => shareToWhatsApp(shareMsg)}
+                    className="flex flex-col items-center gap-2 group cursor-pointer"
                   >
                     <div className="w-12 h-12 rounded-full bg-[#25D366]/10 text-[#25D366] flex items-center justify-center group-hover:scale-110 transition duration-300">
                       <MessageCircle className="w-6 h-6 fill-current" />
                     </div>
                     <span className="text-xs font-semibold text-slate-700">WhatsApp</span>
-                  </a>
+                  </button>
 
                   {/* Facebook */}
-                  <a 
-                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col items-center gap-2 group"
+                  <button 
+                    type="button"
+                    onClick={() => openExternalUrl(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`)}
+                    className="flex flex-col items-center gap-2 group cursor-pointer"
                   >
                     <div className="w-12 h-12 rounded-full bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center group-hover:scale-110 transition duration-300">
                       <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
@@ -336,14 +335,13 @@ export function Home() {
                       </svg>
                     </div>
                     <span className="text-xs font-semibold text-slate-700">Facebook</span>
-                  </a>
+                  </button>
 
                   {/* Twitter / X */}
-                  <a 
-                    href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(twitterMsg)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col items-center gap-2 group"
+                  <button 
+                    type="button"
+                    onClick={() => openExternalUrl(`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(twitterMsg)}`)}
+                    className="flex flex-col items-center gap-2 group cursor-pointer"
                   >
                     <div className="w-12 h-12 rounded-full bg-slate-950/10 text-slate-900 flex items-center justify-center group-hover:scale-110 transition duration-300">
                       <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -351,14 +349,13 @@ export function Home() {
                       </svg>
                     </div>
                     <span className="text-xs font-semibold text-slate-700">Twitter / X</span>
-                  </a>
+                  </button>
 
                   {/* Telegram */}
-                  <a 
-                    href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(telegramMsg)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col items-center gap-2 group"
+                  <button 
+                    type="button"
+                    onClick={() => openExternalUrl(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(telegramMsg)}`)}
+                    className="flex flex-col items-center gap-2 group cursor-pointer"
                   >
                     <div className="w-12 h-12 rounded-full bg-[#0088cc]/10 text-[#0088cc] flex items-center justify-center group-hover:scale-110 transition duration-300">
                       <svg className="w-5.5 h-5.5 fill-current" viewBox="0 0 24 24">
@@ -366,7 +363,7 @@ export function Home() {
                       </svg>
                     </div>
                     <span className="text-xs font-semibold text-slate-700">Telegram</span>
-                  </a>
+                  </button>
                 </div>
               );
             })()}

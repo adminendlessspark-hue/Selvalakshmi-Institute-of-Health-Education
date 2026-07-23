@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Course, Student, Video, TestimonialVideo, Appointment, AppointmentSettings } from "../types";
+import { COURSES, DEFAULT_TESTIMONIALS } from "../data";
 import { db, auth } from "../lib/firebase";
 import { collection, doc, onSnapshot, setDoc, deleteDoc, runTransaction, getDocs } from "firebase/firestore";
 
@@ -101,6 +102,7 @@ type StoreContextType = {
   updateWebinarVisible: (v: boolean) => Promise<void>;
   appointmentSettings: AppointmentSettings | null;
   updateAppointmentSettings: (settings: AppointmentSettings) => Promise<void>;
+  restoreDefaultData: () => Promise<void>;
   isAdmin: boolean;
   loggedStudentId: string | null;
   loginAdmin: () => void;
@@ -111,6 +113,12 @@ type StoreContextType = {
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
+const DEFAULT_WHATSAPP = "+91 80728 87131";
+const DEFAULT_YOUTUBE = "https://www.youtube.com/@SelvalakshmiHealthEducation";
+const DEFAULT_INSTAGRAM = "https://www.instagram.com/selvalakshmihealtheducation";
+const DEFAULT_FACEBOOK = "https://www.facebook.com/selvalakshmihealtheducation";
+const DEFAULT_SHARE_TEMPLATE = "🌟 Welcome to Selvalakshmi Health Education! 🌟\n\nExplore our holistic naturopathy & acupressure courses.";
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -119,11 +127,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [logoUrl, setLogoUrl] = useState<string | null>(localStorage.getItem('cachedLogoUrl'));
   const [founderVideoUrl, setFounderVideoUrl] = useState<string | null>(localStorage.getItem('cachedFounderVideo'));
   const [aboutVideoUrl, setAboutVideoUrl] = useState<string | null>(localStorage.getItem('cachedAboutVideo'));
-  const [whatsappNumber, setWhatsappNumber] = useState<string | null>(null);
-  const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null);
-  const [instagramUrl, setInstagramUrl] = useState<string | null>(null);
-  const [facebookUrl, setFacebookUrl] = useState<string | null>(null);
-  const [shareTemplate, setShareTemplate] = useState<string | null>(null);
+  const [whatsappNumber, setWhatsappNumber] = useState<string>(localStorage.getItem('cachedWhatsapp') || DEFAULT_WHATSAPP);
+  const [youtubeUrl, setYoutubeUrl] = useState<string>(localStorage.getItem('cachedYoutube') || DEFAULT_YOUTUBE);
+  const [instagramUrl, setInstagramUrl] = useState<string>(localStorage.getItem('cachedInstagram') || DEFAULT_INSTAGRAM);
+  const [facebookUrl, setFacebookUrl] = useState<string>(localStorage.getItem('cachedFacebook') || DEFAULT_FACEBOOK);
+  const [shareTemplate, setShareTemplate] = useState<string>(localStorage.getItem('cachedShareTemplate') || DEFAULT_SHARE_TEMPLATE);
   const [muthraIconUrl, setMuthraIconUrl] = useState<string | null>(null);
   const [acupressureIconUrl, setAcupressureIconUrl] = useState<string | null>(null);
   const [foodIconUrl, setFoodIconUrl] = useState<string | null>(null);
@@ -144,6 +152,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Load from Firestore on mount
   useEffect(() => {
     const unsubCourses = onSnapshot(collection(db, "courses"), async (snapshot) => {
+      if (snapshot.empty) {
+        // Auto seed default courses if collection is empty
+        try {
+          for (const course of COURSES) {
+            await setDoc(doc(db, "courses", course.id), course);
+          }
+        } catch (err) {
+          console.error("Error auto-seeding initial courses:", err);
+        }
+        setCourses(COURSES);
+        return;
+      }
       const rawData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       try {
         const resolvedData = await Promise.all(rawData.map(async (item) => {
@@ -218,6 +238,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, (error) => console.error(error));
 
     const unsubTestimonial = onSnapshot(collection(db, "testimonialVideos"), async (snapshot) => {
+      if (snapshot.empty) {
+        try {
+          for (const item of DEFAULT_TESTIMONIALS) {
+            await setDoc(doc(db, "testimonialVideos", item.id), item);
+          }
+        } catch (err) {
+          console.error("Error auto-seeding initial testimonials:", err);
+        }
+        setTestimonialVideos(DEFAULT_TESTIMONIALS);
+        return;
+      }
       const rawData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       try {
         const resolvedData = await Promise.all(rawData.map(async (item) => {
@@ -265,11 +296,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAboutVideoUrl(data.aboutVideoUrl || null);
         if(data.aboutVideoUrl) localStorage.setItem('cachedAboutVideo', data.aboutVideoUrl);
         
-        setWhatsappNumber(data.whatsappNumber || null);
-        setYoutubeUrl(data.youtubeUrl || null);
-        setInstagramUrl(data.instagramUrl || null);
-        setFacebookUrl(data.facebookUrl || null);
-        setShareTemplate(data.shareTemplate || null);
+        const wa = data.whatsappNumber || DEFAULT_WHATSAPP;
+        const yt = data.youtubeUrl || DEFAULT_YOUTUBE;
+        const ig = data.instagramUrl || DEFAULT_INSTAGRAM;
+        const fb = data.facebookUrl || DEFAULT_FACEBOOK;
+        const st = data.shareTemplate || DEFAULT_SHARE_TEMPLATE;
+
+        setWhatsappNumber(wa);
+        setYoutubeUrl(yt);
+        setInstagramUrl(ig);
+        setFacebookUrl(fb);
+        setShareTemplate(st);
+
+        localStorage.setItem('cachedWhatsapp', wa);
+        localStorage.setItem('cachedYoutube', yt);
+        localStorage.setItem('cachedInstagram', ig);
+        localStorage.setItem('cachedFacebook', fb);
+        localStorage.setItem('cachedShareTemplate', st);
         
         setMuthraIconUrl(data.muthraIconUrl || null);
         setAcupressureIconUrl(data.acupressureIconUrl || null);
@@ -284,6 +327,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         
         setGpayQrUrl(data.gpayQrUrl || null);
         setAppointmentSettings(data.appointmentSettings || null);
+      } else {
+        setWhatsappNumber(DEFAULT_WHATSAPP);
+        setYoutubeUrl(DEFAULT_YOUTUBE);
+        setInstagramUrl(DEFAULT_INSTAGRAM);
+        setFacebookUrl(DEFAULT_FACEBOOK);
+        setShareTemplate(DEFAULT_SHARE_TEMPLATE);
       }
     }, (error) => console.error(error));
 
@@ -632,16 +681,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const updateSocialLinks = async (whatsapp: string, youtube: string, instagram: string, facebook: string, shareTemplateStr: string) => {
+    const wa = whatsapp.trim() || DEFAULT_WHATSAPP;
+    const yt = youtube.trim() || DEFAULT_YOUTUBE;
+    const ig = instagram.trim() || DEFAULT_INSTAGRAM;
+    const fb = facebook.trim() || DEFAULT_FACEBOOK;
+    const st = shareTemplateStr.trim() || DEFAULT_SHARE_TEMPLATE;
+
+    setWhatsappNumber(wa);
+    setYoutubeUrl(yt);
+    setInstagramUrl(ig);
+    setFacebookUrl(fb);
+    setShareTemplate(st);
+
+    localStorage.setItem('cachedWhatsapp', wa);
+    localStorage.setItem('cachedYoutube', yt);
+    localStorage.setItem('cachedInstagram', ig);
+    localStorage.setItem('cachedFacebook', fb);
+    localStorage.setItem('cachedShareTemplate', st);
+
     try {
       await setDoc(doc(db, "settings", "global"), { 
-        whatsappNumber: whatsapp || null,
-        youtubeUrl: youtube || null,
-        instagramUrl: instagram || null,
-        facebookUrl: facebook || null,
-        shareTemplate: shareTemplateStr || null
+        whatsappNumber: wa,
+        youtubeUrl: yt,
+        instagramUrl: ig,
+        facebookUrl: fb,
+        shareTemplate: st
       }, { merge: true });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, "settings/global");
+      throw err;
     }
   };
 
@@ -673,12 +741,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const restoreDefaultData = async () => {
+    try {
+      // 1. Re-seed default COURSES
+      for (const course of COURSES) {
+        await setDoc(doc(db, "courses", course.id), course, { merge: true });
+      }
+
+      // 2. Re-seed default Student Testimonials (Videos & Audios)
+      for (const testimonial of DEFAULT_TESTIMONIALS) {
+        await setDoc(doc(db, "testimonialVideos", testimonial.id), testimonial, { merge: true });
+      }
+
+      // 3. Re-seed default Global Settings
+      await setDoc(doc(db, "settings", "global"), {
+        whatsappNumber: DEFAULT_WHATSAPP,
+        youtubeUrl: DEFAULT_YOUTUBE,
+        instagramUrl: DEFAULT_INSTAGRAM,
+        facebookUrl: DEFAULT_FACEBOOK,
+        shareTemplate: DEFAULT_SHARE_TEMPLATE,
+        heroOverlayColor: "#1A2F23",
+        heroOverlayOpacity: 70
+      }, { merge: true });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/global");
+      throw err;
+    }
+  };
+
   return (
     <StoreContext.Provider value={{ 
       courses, students, appointments, videos, logoUrl, heroImages, heroOverlayColor, heroOverlayOpacity, gpayQrUrl, testimonialVideos,
       founderVideoUrl, aboutVideoUrl, whatsappNumber, youtubeUrl, instagramUrl, facebookUrl, shareTemplate,
       muthraIconUrl, acupressureIconUrl, foodIconUrl, webinarVisible,
-      appointmentSettings, updateAppointmentSettings,
+      appointmentSettings, updateAppointmentSettings, restoreDefaultData,
       addCourse, updateCourse, deleteCourse, 
       addStudent, updateStudent, deleteStudent, 
       addAppointment, updateAppointmentStatus, deleteAppointment,

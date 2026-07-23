@@ -4,6 +4,8 @@ import { useStore } from "../context/StoreContext";
 import { QRCodeSVG } from "qrcode.react";
 import { API_BASE } from "../config";
 import { Loader2, ArrowLeft, Copy, Check, Share2 } from "lucide-react";
+import { shareToWhatsApp, openExternalUrl } from "../lib/share";
+import { COURSES as DEFAULT_COURSES } from "../data";
 
 const loadRazorpay = () => {
   return new Promise((resolve) => {
@@ -65,7 +67,7 @@ const translations = {
 };
 
 export function Register() {
-  const { courses, addStudent, gpayQrUrl, appointmentSettings, whatsappNumber, students, updateStudent } = useStore();
+  const { courses, addStudent, gpayQrUrl, appointmentSettings, whatsappNumber, youtubeUrl, instagramUrl, facebookUrl, students, updateStudent } = useStore();
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [createdStudentId, setCreatedStudentId] = useState<string | null>(null);
@@ -88,29 +90,41 @@ export function Register() {
     country: "India",
   });
 
-  useEffect(() => {
-    if (courses.length > 0 && !formData.courseId) {
-      setFormData(prev => ({ ...prev, courseId: courses[0].id }));
-    }
-  }, [courses, formData.courseId]);
+  const activeCourses = courses && courses.length > 0 ? courses : DEFAULT_COURSES;
 
   useEffect(() => {
-    const prefillCourse = searchParams.get("course");
+    // Check searchParams from hash router and window search query
+    const hashQueryParam = searchParams.get("course");
+    const windowSearchParam = new URLSearchParams(window.location.search).get("course");
+    const prefillCourse = hashQueryParam || windowSearchParam;
+
     if (prefillCourse) {
+      const raw = prefillCourse.trim();
+      let decoded = raw;
       try {
-        const decoded = decodeURIComponent(prefillCourse);
-        const matched = courses.find(c => c.id === prefillCourse || c.id === decoded);
-        if (matched) {
-          setFormData(prev => ({ ...prev, courseId: matched.id }));
-        }
+        decoded = decodeURIComponent(raw).trim();
       } catch (e) {
-        const matched = courses.find(c => c.id === prefillCourse);
-        if (matched) {
-          setFormData(prev => ({ ...prev, courseId: matched.id }));
-        }
+        // ignore fallback
+      }
+
+      const matched = activeCourses.find(c => 
+        c.id === raw || 
+        c.id === decoded ||
+        c.id.toLowerCase() === decoded.toLowerCase() ||
+        c.title.toLowerCase() === decoded.toLowerCase() ||
+        c.title.toLowerCase().includes(decoded.toLowerCase())
+      );
+
+      if (matched) {
+        setFormData(prev => ({ ...prev, courseId: matched.id }));
+        return;
       }
     }
-  }, [searchParams, courses]);
+
+    if (activeCourses.length > 0 && !formData.courseId) {
+      setFormData(prev => ({ ...prev, courseId: activeCourses[0].id }));
+    }
+  }, [searchParams, courses, activeCourses, formData.courseId]);
 
   const [loadingPayment, setLoadingPayment] = useState(false);
 
@@ -290,14 +304,13 @@ export function Register() {
           <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
             <h3 className="font-bold text-green-800 mb-2">Join our WhatsApp Group</h3>
             <p className="text-sm text-green-700 mb-4">Get the latest updates, class links, and announcements.</p>
-            <a 
-              href="https://chat.whatsapp.com/Dz3WU5fYBvA243FlXYP4Rj" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center w-full bg-[#25D366] text-white font-bold py-3 rounded-md hover:bg-[#128C7E] transition"
+            <button 
+              type="button"
+              onClick={() => openExternalUrl("https://chat.whatsapp.com/Dz3WU5fYBvA243FlXYP4Rj")}
+              className="inline-flex items-center justify-center w-full bg-[#25D366] text-white font-bold py-3 rounded-md hover:bg-[#128C7E] transition cursor-pointer"
             >
               Join WhatsApp Group
-            </a>
+            </button>
           </div>
 
           <p className="text-sm text-slate-500 mb-8 max-w-sm mx-auto">
@@ -471,7 +484,7 @@ export function Register() {
         </div>
 
         {(() => {
-          const selectedCourseObj = courses.find((c) => c.id === formData.courseId);
+          const selectedCourseObj = activeCourses.find((c) => c.id === formData.courseId) || activeCourses[0];
           if (!selectedCourseObj) return null;
           return (
             <div className="bg-white rounded-xl shadow-sm border border-sage-100 overflow-hidden mb-10">
@@ -569,8 +582,8 @@ export function Register() {
 
                 {/* Explicit Shareable / Direct Registration Link (Required) */}
                 {(() => {
-                  const displayUrl = `${window.location.origin}/register?course=${selectedCourseObj.id}`;
-                  const encodedUrl = `${window.location.origin}/register?course=${encodeURIComponent(selectedCourseObj.id)}`;
+                  const displayUrl = `${window.location.origin}/#/register?course=${selectedCourseObj.id}`;
+                  const encodedUrl = `${window.location.origin}/#/register?course=${encodeURIComponent(selectedCourseObj.id)}`;
                   const courseFeeText = selectedCourseObj.fee 
                     ? (selectedCourseObj.fee.toLowerCase() === 'free' || selectedCourseObj.fee.includes('₹') ? selectedCourseObj.fee : `₹${selectedCourseObj.fee}`)
                     : 'N/A';
@@ -581,9 +594,25 @@ export function Register() {
                   const videoLineTa = selectedCourseObj.videoUrl ? `\n\n📺 *அறிமுக வீடியோவை பார்க்க:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
                   const posterLineTa = (selectedCourseObj.imageUrl && !selectedCourseObj.imageUrl.startsWith("data:")) ? `\n\n🖼️ *வகுப்பு போஸ்டர்:* \n🔗 ${selectedCourseObj.imageUrl}` : "";
 
+                  const phoneNo = whatsappNumber || "+91 80728 87131";
+                  const socialLinksEn = [
+                    youtubeUrl ? `▶️ *YouTube:* ${youtubeUrl}` : "",
+                    instagramUrl ? `📸 *Instagram:* ${instagramUrl}` : "",
+                    facebookUrl ? `🌐 *Facebook:* ${facebookUrl}` : ""
+                  ].filter(Boolean).join("\n");
+
+                  const socialLinksTa = [
+                    youtubeUrl ? `▶️ *யூடியூப்:* ${youtubeUrl}` : "",
+                    instagramUrl ? `📸 *இன்ஸ்டாகிராம்:* ${instagramUrl}` : "",
+                    facebookUrl ? `🌐 *ஃபேஸ்புக்:* ${facebookUrl}` : ""
+                  ].filter(Boolean).join("\n");
+
+                  const modesEn = `\n\n📍 *Modes of Study Available:*\n📍 *Offline Classes:* Practical, hands-on physical labs and classroom training.\n💻 *Online Classes:* Learn from anywhere with our advanced interactive student app.`;
+                  const modesTa = `\n\n📍 *வகுப்புகள் நடைபெறும் முறைகள்:*\n📍 *நேரடி வகுப்புகள் (Offline):* நேரடி பயிற்சி மற்றும் செயல்முறை விளக்கங்கள்.\n💻 *ஆன்லைன் வகுப்புகள் (Online):* எங்கள் மேம்பட்ட செயலி மூலம் எந்த இடத்திலிருந்தும் கற்கலாம்.`;
+
                   const shareMsg = language === "en"
-                    ? `🌟 *Join our program: ${selectedCourseObj.title}* 🌟\n\n⏱️ *Duration:* ${selectedCourseObj.duration || 'N/A'}\n💰 *Fee:* ${courseFeeText}${videoLineEn}${posterLineEn}\n\n✨ *Course Overview & Highlights:* \n${selectedCourseObj.description}\n\n👇 *Register here:* \n🔗 ${encodedUrl}`
-                    : `🌟 *எங்களது புதிய வகுப்பில் இணையுங்கள்: ${selectedCourseObj.title}* 🌟\n\n⏱️ *கால அளவு:* ${selectedCourseObj.duration || 'N/A'}\n💰 *கட்டணம்:* ${courseFeeText}${videoLineTa}${posterLineTa}\n\n✨ *வகுப்பு அறிமுகம் & சிறப்பம்சங்கள்:* \n${selectedCourseObj.description}\n\n👇 *இப்போதே பதிவு செய்ய:* \n🔗 ${encodedUrl}`;
+                    ? `🌟 *Join our program: ${selectedCourseObj.title}* 🌟${modesEn}\n\n⏱️ *Duration:* ${selectedCourseObj.duration || 'N/A'}\n💰 *Fee:* ${courseFeeText}${videoLineEn}${posterLineEn}\n\n✨ *Course Overview & Highlights:* \n${selectedCourseObj.description}\n\n👇 *Register here:* \n🔗 ${encodedUrl}\n\n📞 *Call / WhatsApp:* ${phoneNo}${socialLinksEn ? `\n${socialLinksEn}` : ""}`
+                    : `🌟 *எங்களது புதிய வகுப்பில் இணையுங்கள்: ${selectedCourseObj.title}* 🌟${modesTa}\n\n⏱️ *கால அளவு:* ${selectedCourseObj.duration || 'N/A'}\n💰 *கட்டணம்:* ${courseFeeText}${videoLineTa}${posterLineTa}\n\n✨ *வகுப்பு அறிமுகம் & சிறப்பம்சங்கள்:* \n${selectedCourseObj.description}\n\n👇 *இப்போதே பதிவு செய்ய:* \n🔗 ${encodedUrl}\n\n📞 *அழைப்பு / வாட்ஸ்அப்:* ${phoneNo}${socialLinksTa ? `\n${socialLinksTa}` : ""}`;
                   const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
 
                   return (
@@ -631,15 +660,14 @@ export function Register() {
                             )}
                           </button>
                           
-                          <a
-                            href={whatsappUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg transition font-bold text-xs shadow-sm"
+                          <button
+                            type="button"
+                            onClick={() => shareToWhatsApp(shareMsg)}
+                            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg transition font-bold text-xs shadow-sm cursor-pointer"
                           >
                             <Share2 className="w-3.5 h-3.5" />
                             <span>{language === "en" ? "Share" : "பகிர்"}</span>
-                          </a>
+                          </button>
                         </div>
                       </div>
                     </div>

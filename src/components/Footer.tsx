@@ -1,6 +1,7 @@
 import { MessageCircle, Youtube, Instagram, Facebook, MapPin, Phone, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
+import { openExternalUrl } from "../lib/share";
 
 export function Footer() {
   const { whatsappNumber, youtubeUrl, instagramUrl, facebookUrl, loggedStudentId, isAdmin, webinarVisible } = useStore();
@@ -57,48 +58,44 @@ export function Footer() {
               <h3 className="text-white font-bold text-sm mb-3">Connect With Us</h3>
               <div className="flex items-center gap-4">
                 {whatsappNumber && (
-                  <a 
-                    href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}`}
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-[#25D366] text-white rounded-full flex items-center justify-center hover:opacity-80 transition-opacity shadow-md"
+                  <button 
+                    type="button"
+                    onClick={() => openExternalUrl(`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}`)}
+                    className="w-10 h-10 bg-[#25D366] text-white rounded-full flex items-center justify-center hover:opacity-80 transition-opacity shadow-md cursor-pointer"
                     aria-label="WhatsApp"
                   >
                     <MessageCircle className="w-5 h-5" />
-                  </a>
+                  </button>
                 )}
                 {youtubeUrl && (
-                  <a 
-                    href={youtubeUrl.startsWith('http') ? youtubeUrl : `https://${youtubeUrl}`}
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-[#FF0000] text-white rounded-full flex items-center justify-center hover:opacity-80 transition-opacity shadow-md"
+                  <button 
+                    type="button"
+                    onClick={() => openExternalUrl(youtubeUrl.startsWith('http') ? youtubeUrl : `https://${youtubeUrl}`)}
+                    className="w-10 h-10 bg-[#FF0000] text-white rounded-full flex items-center justify-center hover:opacity-80 transition-opacity shadow-md cursor-pointer"
                     aria-label="YouTube"
                   >
                     <Youtube className="w-5 h-5" />
-                  </a>
+                  </button>
                 )}
                 {instagramUrl && (
-                  <a 
-                    href={instagramUrl.startsWith('http') ? instagramUrl : `https://${instagramUrl}`}
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white rounded-full flex items-center justify-center hover:opacity-80 transition-opacity shadow-md"
+                  <button 
+                    type="button"
+                    onClick={() => openExternalUrl(instagramUrl.startsWith('http') ? instagramUrl : `https://${instagramUrl}`)}
+                    className="w-10 h-10 bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white rounded-full flex items-center justify-center hover:opacity-80 transition-opacity shadow-md cursor-pointer"
                     aria-label="Instagram"
                   >
                     <Instagram className="w-5 h-5" />
-                  </a>
+                  </button>
                 )}
                 {facebookUrl && (
-                  <a 
-                    href={facebookUrl.startsWith('http') ? facebookUrl : `https://${facebookUrl}`}
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-[#1877F2] text-white rounded-full flex items-center justify-center hover:opacity-80 transition-opacity shadow-md"
+                  <button 
+                    type="button"
+                    onClick={() => openExternalUrl(facebookUrl.startsWith('http') ? facebookUrl : `https://${facebookUrl}`)}
+                    className="w-10 h-10 bg-[#1877F2] text-white rounded-full flex items-center justify-center hover:opacity-80 transition-opacity shadow-md cursor-pointer"
                     aria-label="Facebook"
                   >
                     <Facebook className="w-5 h-5" />
-                  </a>
+                  </button>
                 )}
               </div>
             </div>

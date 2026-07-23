@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle, Loader2, MessageCircle, Mail } from "lucide-rea
 import { cn } from "../lib/utils";
 import { getOAuthToken } from "../lib/oauth";
 import { API_BASE } from "../config";
+import { openExternalUrl } from "../lib/share";
 
 const loadRazorpay = () => {
   return new Promise((resolve) => {
@@ -74,7 +75,7 @@ export function Appointment() {
         const finalMeetLink = meetLink || "Link will be shared by Admin";
         const message = `Hello ${formData.name},\n\nYour consultation appointment is confirmed for ${formData.date} at ${formData.time}.\n\nPlease join using this Google Meet link: ${finalMeetLink}\n\nFrom: jcmpselvalakshmifoundation@gmail.com`;
 
-        window.open(`https://wa.me/91${customerPhone}?text=${encodeURIComponent(message)}`, '_blank');
+        openExternalUrl(`https://wa.me/91${customerPhone}?text=${encodeURIComponent(message)}`);
         
         if (formData.email) {
           const subject = `Consultation Appointment Confirmation - ${formData.date} ${formData.time}`;
@@ -224,7 +225,7 @@ export function Appointment() {
                   const customerPhone = formData.phone.replace(/[^0-9]/g, '');
                   const finalMeetLink = generatedMeetLink || appointmentSettings?.defaultMeetLink || "Link will be shared by Admin";
                   const message = `Hello ${formData.name},\n\nYour consultation appointment is confirmed for ${formData.date} at ${formData.time}.\n\nPlease join using this Google Meet link: ${finalMeetLink}\n\nFrom: jcmpselvalakshmifoundation@gmail.com`;
-                  window.open(`https://wa.me/91${customerPhone}?text=${encodeURIComponent(message)}`, '_blank');
+                  openExternalUrl(`https://wa.me/91${customerPhone}?text=${encodeURIComponent(message)}`);
                 }}
                 className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition shadow-sm text-sm"
               >
@@ -237,7 +238,7 @@ export function Appointment() {
                     const cleanAdminPhone = whatsappNumber.replace(/[^0-9]/g, '');
                     const finalMeetLink = generatedMeetLink || appointmentSettings?.defaultMeetLink || "Link will be shared by Admin";
                     const adminMessage = `New Consultation Appointment Booked!\n\nName: ${formData.name}\nPhone: +91 ${formData.phone}\nEmail: ${formData.email || 'N/A'}\nDate: ${formData.date}\nTime: ${formData.time}\nMeet Link: ${finalMeetLink}`;
-                    window.open(`https://wa.me/${cleanAdminPhone}?text=${encodeURIComponent(adminMessage)}`, '_blank');
+                    openExternalUrl(`https://wa.me/${cleanAdminPhone}?text=${encodeURIComponent(adminMessage)}`);
                   }}
                   className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-sm text-sm"
                 >

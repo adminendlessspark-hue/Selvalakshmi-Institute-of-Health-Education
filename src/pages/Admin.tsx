@@ -5,6 +5,7 @@ import { getOAuthToken } from "../lib/oauth";
 import { Users, BookOpen, Video as VideoIcon, Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Upload, Share2, Copy, ListChecks, Activity, Headphones, Download, ExternalLink } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Course, Student, Video, Quiz } from "../types";
+import { shareToWhatsApp, openExternalUrl } from "../lib/share";
 
 const formatDateString = (dateStr: string) => {
   if (!dateStr) return "";
@@ -72,7 +73,7 @@ export function Admin() {
     addVideo, updateVideo, deleteVideo, updateLogo,
     updateFounderVideo, updateAboutVideo, updateSocialLinks,
     addHeroImage, removeHeroImage, updateHeroOverlay, updateGpayQr, addTestimonialVideo, removeTestimonialVideo, updateFeatureIcons,
-    webinarVisible, updateWebinarVisible, loginStudent
+    webinarVisible, updateWebinarVisible, loginStudent, restoreDefaultData
   } = useStore();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"registrations" | "appointments" | "courses" | "videos" | "appearance" | "marketing">("registrations");
@@ -111,7 +112,7 @@ export function Admin() {
   const handleShareMeetLink = (apt: any) => {
     const meetLink = apt.meetLink || appointmentSettings?.defaultMeetLink || "No link provided";
     const message = `Hello ${apt.name},\n\nYour consultation appointment is confirmed for ${apt.date} at ${apt.time}.\n\nPlease join using this Google Meet link: ${meetLink}\n\nFrom: jcmpselvalakshmifoundation@gmail.com`;
-    window.open(`https://wa.me/${apt.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+    openExternalUrl(`https://wa.me/${apt.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`);
     
     if (apt.email) {
       const subject = `Consultation Appointment Confirmation - ${apt.date} ${apt.time}`;
@@ -168,6 +169,22 @@ export function Admin() {
     }
   }, [appointmentSettings]);
 
+  const [waInput, setWaInput] = useState<string>(whatsappNumber || "");
+  const [ytInput, setYtInput] = useState<string>(youtubeUrl || "");
+  const [igInput, setIgInput] = useState<string>(instagramUrl || "");
+  const [fbInput, setFbInput] = useState<string>(facebookUrl || "");
+  const [stInput, setStInput] = useState<string>(shareTemplate || "");
+  const [isSavingSocial, setIsSavingSocial] = useState<boolean>(false);
+  const [isRestoringData, setIsRestoringData] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    setWaInput(whatsappNumber || "");
+    setYtInput(youtubeUrl || "");
+    setIgInput(instagramUrl || "");
+    setFbInput(facebookUrl || "");
+    setStInput(shareTemplate || "");
+  }, [whatsappNumber, youtubeUrl, instagramUrl, facebookUrl, shareTemplate]);
+
   const handleAddCourse = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourse.id) newCourse.id = newCourse.title.toLowerCase().replace(/\s+/g, '-');
@@ -203,12 +220,12 @@ export function Admin() {
       const isTestimonyUploaded = testimonyUrl && (testimonyUrl.startsWith("data:") || testimonyUrl === "chunked");
 
       const getPublicBaseUrl = () => {
-        return "https://selvalakshmihealtheducation.in";
+        return window.location.origin || "https://selvalakshmihealtheducation.in";
       };
 
       const publicBaseUrl = getPublicBaseUrl();
       const cleanBaseUrl = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
-      const registerUrl = `${cleanBaseUrl}/register?course=${course.id}`;
+      const registerUrl = `${cleanBaseUrl}/#/register?course=${course.id}`;
 
       const hookText = shareTemplate ? `${shareTemplate}\n\n` : '';
 
@@ -230,14 +247,23 @@ export function Admin() {
           }
         }
 
-        const phoneNo = whatsappNumber ? whatsappNumber : "+91 90428 21999";
+        const phoneNo = whatsappNumber ? whatsappNumber : "+91 80728 87131";
+        const socialLinksEn = [
+          youtubeUrl ? `▶️ *YouTube:* ${youtubeUrl}` : "",
+          instagramUrl ? `📸 *Instagram:* ${instagramUrl}` : "",
+          facebookUrl ? `🌐 *Facebook:* ${facebookUrl}` : ""
+        ].filter(Boolean).join("\n");
 
         const bodyContentEn = `Hello! 👋
 
 Welcome to *Selvalakshmi Health Education*!
 We are excited to share an amazing opportunity to transform your life and health! 🚀
 
-${hookText ? `${hookText}\n` : ""}🌟 *Explore our industry-leading program:*
+${hookText ? `${hookText}\n` : ""}📍 *Modes of Study Available:*
+📍 *Offline Classes:* Practical, hands-on physical labs and classroom training.
+💻 *Online Classes:* Learn from anywhere with our advanced interactive student app.
+
+🌟 *Explore our industry-leading program:*
 🎓 *Course Name:* ${course.title}
 ⏱️ *Duration:* ${course.duration}
 💰 *Course Fee:* ${course.fee ? (course.fee.toLowerCase() === 'free' || course.fee.includes('₹') ? course.fee : `₹${course.fee}`) : "Free"}
@@ -253,7 +279,7 @@ ${registerUrl}
 ${videoLineEn}${testimonyLineEn}${posterLineEn}
 
 📞 *Or reach us directly on Call / WhatsApp:* ${phoneNo}
-
+${socialLinksEn ? `${socialLinksEn}\n` : ""}
 Let's build a healthier future together! ⭐️
 
 🔗 *For Admission:* ${registerUrl}`;
@@ -289,14 +315,23 @@ Let's build a healthier future together! ⭐️
           }
         }
 
-        const phoneNo = whatsappNumber ? whatsappNumber : "+91 90428 21999";
+        const phoneNo = whatsappNumber ? whatsappNumber : "+91 80728 87131";
+        const socialLinksTa = [
+          youtubeUrl ? `▶️ *யூடியூப்:* ${youtubeUrl}` : "",
+          instagramUrl ? `📸 *இன்ஸ்டாகிராம்:* ${instagramUrl}` : "",
+          facebookUrl ? `🌐 *ஃபேஸ்புக்:* ${facebookUrl}` : ""
+        ].filter(Boolean).join("\n");
 
         const bodyContentTa = `வணக்கம்! 👋
 
 *செல்வலட்சுமி ஹெல்த் எஜுகேஷன்* உங்களை அன்போடு வரவேற்கிறது!
 உங்கள் ஆரோக்கியத்தையும் வாழ்க்கை முறையையும் மாற்றுவதற்கான ஒரு அருமையான வாய்ப்பைப் பகிர்ந்து கொள்வதில் நாங்கள் மகிழ்ச்சியடைகிறோம்! 🚀
 
-${hookText ? `${hookText}\n` : ""}🌟 *எங்கள் புதிய வகுப்பில் இணையுங்கள்:*
+${hookText ? `${hookText}\n` : ""}📍 *வகுப்புகள் நடைபெறும் முறைகள்:*
+📍 *நேரடி வகுப்புகள் (Offline):* நேரடி பயிற்சி மற்றும் செயல்முறை விளக்கங்கள்.
+💻 *ஆன்லைன் வகுப்புகள் (Online):* எங்கள் மேம்பட்ட செயலி மூலம் எந்த இடத்திலிருந்தும் கற்கலாம்.
+
+🌟 *எங்கள் புதிய வகுப்பில் இணையுங்கள்:*
 🎓 *வகுப்பு பெயர்:* ${course.title}
 ⏱️ *கால அளவு:* ${course.duration}
 💰 *கட்டணம்:* ${course.fee ? (course.fee.toLowerCase() === 'free' || course.fee.includes('₹') ? course.fee : `₹${course.fee}`) : "இலவசம்"}
@@ -312,7 +347,7 @@ ${registerUrl}
 ${videoLineTa}${testimonyLineTa}${posterLineTa}
 
 📞 *நேரடித் தொடர்புக்கு (அழைப்பு / வாட்ஸ்அப்):* ${phoneNo}
-
+${socialLinksTa ? `${socialLinksTa}\n` : ""}
 ஆரோக்கியமான எதிர்காலத்தை ஒன்றிணைந்து உருவாக்குவோம்! ⭐️
 
 🔗 *இப்போதே பதிவு செய்ய:* ${registerUrl}`;
@@ -1793,18 +1828,18 @@ ${videoLineTa}${testimonyLineTa}${posterLineTa}
                       <label className="block text-sm font-medium text-slate-700 mb-1">WhatsApp Number (with country code, e.g. +91XXXXXXXXXX)</label>
                       <input 
                         type="text" 
-                        id="whatsappNumberInput"
-                        defaultValue={whatsappNumber || ""} 
+                        value={waInput} 
+                        onChange={(e) => setWaInput(e.target.value)}
                         className="w-full px-3 py-2 border rounded-md" 
-                        placeholder="+919876543210"
+                        placeholder="+918072887131"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">YouTube Channel URL</label>
                       <input 
                         type="url" 
-                        id="youtubeUrlInput"
-                        defaultValue={youtubeUrl || ""} 
+                        value={ytInput} 
+                        onChange={(e) => setYtInput(e.target.value)}
                         className="w-full px-3 py-2 border rounded-md" 
                         placeholder="https://youtube.com/..."
                       />
@@ -1813,8 +1848,8 @@ ${videoLineTa}${testimonyLineTa}${posterLineTa}
                       <label className="block text-sm font-medium text-slate-700 mb-1">Instagram Profile URL</label>
                       <input 
                         type="url" 
-                        id="instagramUrlInput"
-                        defaultValue={instagramUrl || ""} 
+                        value={igInput} 
+                        onChange={(e) => setIgInput(e.target.value)}
                         className="w-full px-3 py-2 border rounded-md" 
                         placeholder="https://instagram.com/..."
                       />
@@ -1823,8 +1858,8 @@ ${videoLineTa}${testimonyLineTa}${posterLineTa}
                       <label className="block text-sm font-medium text-slate-700 mb-1">Facebook Profile URL</label>
                       <input 
                         type="url" 
-                        id="facebookUrlInput"
-                        defaultValue={facebookUrl || ""} 
+                        value={fbInput} 
+                        onChange={(e) => setFbInput(e.target.value)}
                         className="w-full px-3 py-2 border rounded-md" 
                         placeholder="https://facebook.com/..."
                       />
@@ -1832,29 +1867,61 @@ ${videoLineTa}${testimonyLineTa}${posterLineTa}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Custom Share Template Hook (Optional)</label>
                       <textarea
-                        id="shareTemplateInput"
-                        defaultValue={shareTemplate || ""}
+                        value={stInput}
+                        onChange={(e) => setStInput(e.target.value)}
                         className="w-full h-24 p-3 border rounded-md"
                         placeholder="Enter a custom catchphrase or promotional hook to include in the generated share templates..."
                       />
                     </div>
                     <div className="flex justify-start">
                       <button 
-                        onClick={() => {
-                          const wa = (document.getElementById('whatsappNumberInput') as HTMLInputElement).value.trim();
-                          const yt = (document.getElementById('youtubeUrlInput') as HTMLInputElement).value.trim();
-                          const ig = (document.getElementById('instagramUrlInput') as HTMLInputElement).value.trim();
-                          const fb = (document.getElementById('facebookUrlInput') as HTMLInputElement).value.trim();
-                          const st = (document.getElementById('shareTemplateInput') as HTMLTextAreaElement).value.trim();
-                          updateSocialLinks(wa, yt, ig, fb, st);
-                          alert('Social links updated successfully!');
+                        disabled={isSavingSocial}
+                        onClick={async () => {
+                          setIsSavingSocial(true);
+                          try {
+                            await updateSocialLinks(waInput.trim(), ytInput.trim(), igInput.trim(), fbInput.trim(), stInput.trim());
+                            alert('Social links updated successfully!');
+                          } catch (err) {
+                            console.error('Error saving social links:', err);
+                            alert('Failed to save social links. Please check your connection and try again.');
+                          } finally {
+                            setIsSavingSocial(false);
+                          }
                         }}
-                        className="bg-sage-600 text-white px-4 py-2 rounded-md hover:bg-sage-700 transition shadow-sm text-sm"
+                        className="bg-sage-600 text-white px-4 py-2 rounded-md hover:bg-sage-700 transition shadow-sm text-sm disabled:opacity-50"
                       >
-                        Save Social Links
+                        {isSavingSocial ? 'Saving...' : 'Save Social Links'}
                       </button>
                     </div>
                   </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-amber-200 bg-amber-50/20 max-w-2xl">
+                  <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
+                    🔄 Restore Default Course Database & Student Testimonials (Videos & Audios)
+                  </h3>
+                  <p className="text-sm text-slate-600 mb-4">
+                    If any course details, student testimonials (videos & audios), or default social media URLs are missing, click below to re-sync and restore default courses, testimonials, and social media links in Firebase.
+                  </p>
+                  <button 
+                    disabled={isRestoringData}
+                    onClick={async () => {
+                      if (!confirm("Are you sure you want to restore default course database, student testimonials (videos & audios), and social links?")) return;
+                      setIsRestoringData(true);
+                      try {
+                        await restoreDefaultData();
+                        alert("Default course database, student testimonials (videos & audios), and social links restored successfully!");
+                      } catch (err) {
+                        console.error("Error restoring default data:", err);
+                        alert("Failed to restore default data. Please check your connection and try again.");
+                      } finally {
+                        setIsRestoringData(false);
+                      }
+                    }}
+                    className="bg-amber-600 text-white px-4 py-2 rounded-md hover:bg-amber-700 transition shadow-sm text-sm disabled:opacity-50 font-medium"
+                  >
+                    {isRestoringData ? "Restoring..." : "Restore Default Courses, Testimonials & Social Links"}
+                  </button>
                 </div>
 
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-sage-100 max-w-2xl">
@@ -1940,17 +2007,16 @@ ${videoLineTa}${testimonyLineTa}${posterLineTa}
                           <Copy className="w-3.5 h-3.5 text-slate-600" /> Copy Text
                         </button>
                         
-                        <a 
-                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(shareTemplateText)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 min-w-[150px] flex items-center justify-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-2 rounded-lg transition font-bold text-xs shadow-sm"
+                        <button 
+                          type="button"
+                          onClick={() => shareToWhatsApp(shareTemplateText)}
+                          className="flex-1 min-w-[150px] flex items-center justify-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-2 rounded-lg transition font-bold text-xs shadow-sm cursor-pointer"
                         >
                           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.705 1.457h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413"/>
                           </svg>
                           <span>Share on WhatsApp</span>
-                        </a>
+                        </button>
                         
                         <button 
                           onClick={async () => {

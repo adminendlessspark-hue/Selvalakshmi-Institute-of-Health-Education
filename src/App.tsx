@@ -28,9 +28,26 @@ function ProtectedStudent({ children }: { children: React.ReactNode }) {
   return (loggedStudentId || isAdmin) ? children : <Navigate to="/login" />;
 }
 
+function HashRedirector() {
+  React.useEffect(() => {
+    // If the browser visits a path without the Hash prefix e.g. /register or /register?course=xxx
+    const pathname = window.location.pathname;
+    const search = window.location.search;
+    if (pathname && pathname !== "/" && !window.location.hash) {
+      window.location.replace(`${window.location.origin}/#${pathname}${search}`);
+    } else if (search && (!window.location.hash || !window.location.hash.includes("?"))) {
+      // If query params are in window.location.search instead of inside the hash e.g. /#/register?course=xxx
+      const currentHashPath = window.location.hash ? window.location.hash.split("?")[0] : "#/";
+      window.location.replace(`${window.location.origin}/${currentHashPath}${search}`);
+    }
+  }, []);
+  return null;
+}
+
 export default function App() {
   return (
     <StoreProvider>
+      <HashRedirector />
       <Router>
         <div className="min-h-screen flex flex-col font-sans text-slate-800 bg-sage-50">
           <Navigation />
