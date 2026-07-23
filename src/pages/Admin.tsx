@@ -5,7 +5,7 @@ import { getOAuthToken } from "../lib/oauth";
 import { Users, BookOpen, Video as VideoIcon, Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Upload, Share2, Copy, ListChecks, Activity, Headphones, Download, ExternalLink } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Course, Student, Video, Quiz } from "../types";
-import { shareToWhatsApp, openExternalUrl } from "../lib/share";
+import { shareToWhatsApp, openExternalUrl, generateReadableUrlParam } from "../lib/share";
 
 const formatDateString = (dateStr: string) => {
   if (!dateStr) return "";
@@ -220,12 +220,13 @@ export function Admin() {
       const isTestimonyUploaded = testimonyUrl && (testimonyUrl.startsWith("data:") || testimonyUrl === "chunked");
 
       const getPublicBaseUrl = () => {
-        return window.location.origin || "https://selvalakshmihealtheducation.in";
+        return "https://www.selvalakshmihealtheducation.in";
       };
 
       const publicBaseUrl = getPublicBaseUrl();
       const cleanBaseUrl = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
-      const registerUrl = `${cleanBaseUrl}/#/register?course=${course.id}`;
+      const readableId = generateReadableUrlParam(course.id);
+      const registerUrl = `${cleanBaseUrl}/register?course=${readableId}`;
 
       const hookText = shareTemplate ? `${shareTemplate}\n\n` : '';
 
@@ -259,9 +260,8 @@ export function Admin() {
 Welcome to *Selvalakshmi Health Education*!
 We are excited to share an amazing opportunity to transform your life and health! 🚀
 
-${hookText ? `${hookText}\n` : ""}📍 *Modes of Study Available:*
-📍 *Offline Classes:* Practical, hands-on physical labs and classroom training.
-💻 *Online Classes:* Learn from anywhere with our advanced interactive student app.
+${hookText ? `${hookText}\n` : ""}💻 *Mode of Study:* Online Class
+🛡️ *100% Money Back Guarantee*
 
 🌟 *Explore our industry-leading program:*
 🎓 *Course Name:* ${course.title}
@@ -273,14 +273,10 @@ ${hookText ? `${hookText}\n` : ""}📍 *Modes of Study Available:*
 ✅ 100% Practical & Natural Therapies
 ✅ Industry Expert Mentorship & Diet Support
 
-Ready to get started or learn more?
-👉 *Fill out this quick inquiry form and we'll get right back to you:*
-${registerUrl}
 ${videoLineEn}${testimonyLineEn}${posterLineEn}
 
-📞 *Or reach us directly on Call / WhatsApp:* ${phoneNo}
-${socialLinksEn ? `${socialLinksEn}\n` : ""}
-Let's build a healthier future together! ⭐️
+📞 *Call / WhatsApp:* ${phoneNo}
+🌐 *Website:* ${publicBaseUrl}
 
 🔗 *For Admission:* ${registerUrl}`;
 
@@ -327,9 +323,8 @@ Let's build a healthier future together! ⭐️
 *செல்வலட்சுமி ஹெல்த் எஜுகேஷன்* உங்களை அன்போடு வரவேற்கிறது!
 உங்கள் ஆரோக்கியத்தையும் வாழ்க்கை முறையையும் மாற்றுவதற்கான ஒரு அருமையான வாய்ப்பைப் பகிர்ந்து கொள்வதில் நாங்கள் மகிழ்ச்சியடைகிறோம்! 🚀
 
-${hookText ? `${hookText}\n` : ""}📍 *வகுப்புகள் நடைபெறும் முறைகள்:*
-📍 *நேரடி வகுப்புகள் (Offline):* நேரடி பயிற்சி மற்றும் செயல்முறை விளக்கங்கள்.
-💻 *ஆன்லைன் வகுப்புகள் (Online):* எங்கள் மேம்பட்ட செயலி மூலம் எந்த இடத்திலிருந்தும் கற்கலாம்.
+${hookText ? `${hookText}\n` : ""}💻 *பயிற்சி முறை:* ஆன்லைன் (Online)
+🛡️ *100% பணம் திரும்பப் பெறும் உத்தரவாதம் (Money Back Guarantee)*
 
 🌟 *எங்கள் புதிய வகுப்பில் இணையுங்கள்:*
 🎓 *வகுப்பு பெயர்:* ${course.title}
@@ -341,14 +336,10 @@ ${hookText ? `${hookText}\n` : ""}📍 *வகுப்புகள் நடை
 ✅ 100% இயற்கை மற்றும் சுய-குணப்படுத்தும் பயிற்சிகள்
 ✅ சிறந்த நிபுணர்களின் வழிகாட்டுதல் & உணவு ஆலோசனை
 
-வகுப்பில் சேர அல்லது மேலும் விவரங்கள் அறிய:
-👉 *இந்த எளிய விண்ணப்பப் படிவத்தைப் பூர்த்தி செய்யவும்:*
-${registerUrl}
 ${videoLineTa}${testimonyLineTa}${posterLineTa}
 
-📞 *நேரடித் தொடர்புக்கு (அழைப்பு / வாட்ஸ்அப்):* ${phoneNo}
-${socialLinksTa ? `${socialLinksTa}\n` : ""}
-ஆரோக்கியமான எதிர்காலத்தை ஒன்றிணைந்து உருவாக்குவோம்! ⭐️
+📞 *அழைப்பு / வாட்ஸ்அப்:* ${phoneNo}
+🌐 *இணையதளம்:* ${publicBaseUrl}
 
 🔗 *இப்போதே பதிவு செய்ய:* ${registerUrl}`;
 

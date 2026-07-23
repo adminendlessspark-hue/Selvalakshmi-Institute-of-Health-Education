@@ -4,7 +4,7 @@ import { useStore } from "../context/StoreContext";
 import { QRCodeSVG } from "qrcode.react";
 import { API_BASE } from "../config";
 import { Loader2, ArrowLeft, Copy, Check, Share2 } from "lucide-react";
-import { shareToWhatsApp, openExternalUrl } from "../lib/share";
+import { shareToWhatsApp, openExternalUrl, generateReadableUrlParam } from "../lib/share";
 import { COURSES as DEFAULT_COURSES } from "../data";
 
 const loadRazorpay = () => {
@@ -582,38 +582,29 @@ export function Register() {
 
                 {/* Explicit Shareable / Direct Registration Link (Required) */}
                 {(() => {
-                  const displayUrl = `${window.location.origin}/#/register?course=${selectedCourseObj.id}`;
-                  const encodedUrl = `${window.location.origin}/#/register?course=${encodeURIComponent(selectedCourseObj.id)}`;
+                  const readableId = generateReadableUrlParam(selectedCourseObj.id);
+                  const readableUrl = `https://www.selvalakshmihealtheducation.in/register?course=${readableId}`;
+                  
                   const courseFeeText = selectedCourseObj.fee 
                     ? (selectedCourseObj.fee.toLowerCase() === 'free' || selectedCourseObj.fee.includes('₹') ? selectedCourseObj.fee : `₹${selectedCourseObj.fee}`)
                     : 'N/A';
 
-                  const videoLineEn = selectedCourseObj.videoUrl ? `\n\n📺 *Watch Intro Video:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
+                  const videoLineEn = (selectedCourseObj.videoUrl && selectedCourseObj.videoUrl !== 'chunked') ? `\n\n📺 *Watch Intro Video:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
                   const posterLineEn = (selectedCourseObj.imageUrl && !selectedCourseObj.imageUrl.startsWith("data:")) ? `\n\n🖼️ *Course Poster:* \n🔗 ${selectedCourseObj.imageUrl}` : "";
                   
-                  const videoLineTa = selectedCourseObj.videoUrl ? `\n\n📺 *அறிமுக வீடியோவை பார்க்க:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
+                  const videoLineTa = (selectedCourseObj.videoUrl && selectedCourseObj.videoUrl !== 'chunked') ? `\n\n📺 *அறிமுக வீடியோவை பார்க்க:* \n🔗 ${selectedCourseObj.videoUrl}` : "";
                   const posterLineTa = (selectedCourseObj.imageUrl && !selectedCourseObj.imageUrl.startsWith("data:")) ? `\n\n🖼️ *வகுப்பு போஸ்டர்:* \n🔗 ${selectedCourseObj.imageUrl}` : "";
 
                   const phoneNo = whatsappNumber || "+91 80728 87131";
-                  const socialLinksEn = [
-                    youtubeUrl ? `▶️ *YouTube:* ${youtubeUrl}` : "",
-                    instagramUrl ? `📸 *Instagram:* ${instagramUrl}` : "",
-                    facebookUrl ? `🌐 *Facebook:* ${facebookUrl}` : ""
-                  ].filter(Boolean).join("\n");
+                  const websiteUrl = "https://www.selvalakshmihealtheducation.in";
 
-                  const socialLinksTa = [
-                    youtubeUrl ? `▶️ *யூடியூப்:* ${youtubeUrl}` : "",
-                    instagramUrl ? `📸 *இன்ஸ்டாகிராம்:* ${instagramUrl}` : "",
-                    facebookUrl ? `🌐 *ஃபேஸ்புக்:* ${facebookUrl}` : ""
-                  ].filter(Boolean).join("\n");
-
-                  const modesEn = `\n\n📍 *Modes of Study Available:*\n📍 *Offline Classes:* Practical, hands-on physical labs and classroom training.\n💻 *Online Classes:* Learn from anywhere with our advanced interactive student app.`;
-                  const modesTa = `\n\n📍 *வகுப்புகள் நடைபெறும் முறைகள்:*\n📍 *நேரடி வகுப்புகள் (Offline):* நேரடி பயிற்சி மற்றும் செயல்முறை விளக்கங்கள்.\n💻 *ஆன்லைன் வகுப்புகள் (Online):* எங்கள் மேம்பட்ட செயலி மூலம் எந்த இடத்திலிருந்தும் கற்கலாம்.`;
+                  const modesEn = `\n\n💻 *Mode of Study:* Online Class\n🛡️ *100% Money Back Guarantee*`;
+                  const modesTa = `\n\n💻 *பயிற்சி முறை:* ஆன்லைன் (Online)\n🛡️ *100% பணம் திரும்பப் பெறும் உத்தரவாதம் (Money Back Guarantee)*`;
 
                   const shareMsg = language === "en"
-                    ? `🌟 *Join our program: ${selectedCourseObj.title}* 🌟${modesEn}\n\n⏱️ *Duration:* ${selectedCourseObj.duration || 'N/A'}\n💰 *Fee:* ${courseFeeText}${videoLineEn}${posterLineEn}\n\n✨ *Course Overview & Highlights:* \n${selectedCourseObj.description}\n\n👇 *Register here:* \n🔗 ${encodedUrl}\n\n📞 *Call / WhatsApp:* ${phoneNo}${socialLinksEn ? `\n${socialLinksEn}` : ""}`
-                    : `🌟 *எங்களது புதிய வகுப்பில் இணையுங்கள்: ${selectedCourseObj.title}* 🌟${modesTa}\n\n⏱️ *கால அளவு:* ${selectedCourseObj.duration || 'N/A'}\n💰 *கட்டணம்:* ${courseFeeText}${videoLineTa}${posterLineTa}\n\n✨ *வகுப்பு அறிமுகம் & சிறப்பம்சங்கள்:* \n${selectedCourseObj.description}\n\n👇 *இப்போதே பதிவு செய்ய:* \n🔗 ${encodedUrl}\n\n📞 *அழைப்பு / வாட்ஸ்அப்:* ${phoneNo}${socialLinksTa ? `\n${socialLinksTa}` : ""}`;
-                  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
+                    ? `🌟 *Join our program: ${selectedCourseObj.title}* 🌟${modesEn}\n\n⏱️ *Duration:* ${selectedCourseObj.duration || 'N/A'}\n💰 *Fee:* ${courseFeeText}${videoLineEn}${posterLineEn}\n\n✨ *Course Overview:* \n${selectedCourseObj.description}\n\n👇 *Register here:* \n🔗 ${readableUrl}\n\n📞 *Call / WhatsApp:* ${phoneNo}\n🌐 *Website:* ${websiteUrl}`
+                    : `🌟 *எங்களது புதிய வகுப்பில் இணையுங்கள்: ${selectedCourseObj.title}* 🌟${modesTa}\n\n⏱️ *கால அளவு:* ${selectedCourseObj.duration || 'N/A'}\n💰 *கட்டணம்:* ${courseFeeText}${videoLineTa}${posterLineTa}\n\n✨ *வகுப்பு அறிமுகம்:* \n${selectedCourseObj.description}\n\n👇 *இப்போதே பதிவு செய்ய:* \n🔗 ${readableUrl}\n\n📞 *அழைப்பு / வாட்ஸ்அப்:* ${phoneNo}\n🌐 *இணையதளம்:* ${websiteUrl}`;
+
 
                   return (
                     <div className="mt-6 p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-3">
@@ -635,13 +626,13 @@ export function Register() {
 
                       <div className="flex flex-col sm:flex-row gap-2">
                         <div className="flex-1 bg-white border border-emerald-200 rounded-lg px-3 py-2 text-xs font-mono text-emerald-950 truncate select-all flex items-center justify-between">
-                          <span className="truncate">{displayUrl}</span>
+                          <span className="truncate">{readableUrl}</span>
                         </div>
                         <div className="flex gap-1.5 shrink-0">
                           <button
                             type="button"
                             onClick={() => {
-                              navigator.clipboard.writeText(encodedUrl);
+                              navigator.clipboard.writeText(readableUrl);
                               setCopiedLink(true);
                               setTimeout(() => setCopiedLink(false), 2000);
                             }}
